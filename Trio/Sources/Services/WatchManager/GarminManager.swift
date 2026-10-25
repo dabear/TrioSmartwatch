@@ -83,6 +83,10 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
 
     @Injected() private var iobService: IOBService!
     @Injected() private var trioAlertManager: TrioAlertManager!
+    @Injected() private var watchCommandProcessor: WatchCommandProcessor!
+
+    /// Revoked by `BaseSettingsManager` itself; read here only to refresh the watch after a revocation.
+    @Injected() private var watchCommandAuthorization: WatchCommandAuthorization!
 
     /// Persists the user's device list between app launches.
     @Persisted(key: "BaseGarminManager.persistedDevices") private var persistedDevices: [GarminDevice] = []
@@ -193,6 +197,12 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     /// Track previous Garmin settings to detect what specifically changed
     private var previousGarminSettings = GarminWatchSettings()
 
+    /// Max carbs at the last settings notification; the watch caps its carbs picker with it.
+    private var previousMaxCarbs: Decimal = 0
+
+    /// A newer epoch means a command switch went off since, even if it now shows on again.
+    private var lastSeenCommandRevocation: UInt64 = 0
+
     /// Pending settings update task - waits for user to finish making changes
     private var pendingSettingsUpdate: DispatchWorkItem?
 
@@ -259,6 +269,8 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         units = settingsManager.settings.units
         glucoseColorScheme = settingsManager.settings.glucoseColorScheme
         previousGarminSettings = settingsManager.settings.garminSettings
+        previousMaxCarbs = settingsManager.settings.maxCarbs
+        lastSeenCommandRevocation = watchCommandAuthorization.current
 
         broadcaster.register(SettingsObserver.self, observer: self)
         // Glucose targets are not part of TrioSettings, so editing the target profile
@@ -1022,6 +1034,21 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         }
     }
 
+    /// Main queue only. Best-effort: a dropped push waits for the watch's next preset request.
+    private func pushPresetsToComplications(triggeredBy _: String) {
+        let complicationUUID = GarminWatchface.complication.watchfaceUUID
+        let targets = watchApps.filter { $0.uuid != nil && $0.uuid == complicationUUID }
+        guard !targets.isEmpty else { return }
+
+        let response = GarminMessageEnvelope.presetsResponse(capabilities: watchCommandProcessor.capabilities())
+        for app in targets {
+            guard let key = deliveryKey(for: app), let device = app.device else { continue }
+            let appName = appDisplayName(for: app.uuid)
+            guard isReachable(key: key, device: device, appName: appName) else { continue }
+            sendTargetedResponse(response, to: app, appName: appName)
+        }
+    }
+
     /// Answers one app directly, never through `broadcastWatchStateData`, whose content hash would
     /// otherwise suppress the next state update.
     private func sendTargetedResponse(_ response: [String: Any], to app: IQApp, appName: String) {
@@ -1188,7 +1215,8 @@ extension BaseGarminManager: IQUIOverrideDelegate, IQDeviceEventDelegate, IQAppM
     // MARK: - IQAppMessageDelegate
 
     /// Called when a message arrives from a Garmin watch app (watchface, datafield or complication app).
-    /// Status requests refresh the broadcast state.
+    /// Status requests refresh the broadcast state; preset requests and commands are answered only to
+    /// the requesting app.
     /// - Parameters:
     ///   - message: The message content from the watch app.
     ///   - app: The watch app sending the message.
@@ -1209,7 +1237,7 @@ extension BaseGarminManager: IQUIOverrideDelegate, IQDeviceEventDelegate, IQAppM
             }
         }
 
-        let router = GarminMessageRouter()
+        let router = GarminMessageRouter(processor: watchCommandProcessor)
 
         Task {
             let outcome = await router.route(message, from: appUUID, isRegistered: registered != nil, appName: appName)
@@ -1246,6 +1274,14 @@ extension BaseGarminManager: SettingsObserver {
         let displayAttributesChanged = currentGarminSettings.primaryAttributeChoice != previousGarminSettings
             .primaryAttributeChoice ||
             currentGarminSettings.secondaryAttributeChoice != previousGarminSettings.secondaryAttributeChoice
+        let commandRevocation = watchCommandAuthorization.current
+        let commandSettingsChanged = currentGarminSettings.isCommandControlEnabled != previousGarminSettings
+            .isCommandControlEnabled ||
+            currentGarminSettings.isBolusCommandEnabled != previousGarminSettings.isBolusCommandEnabled ||
+            commandRevocation != lastSeenCommandRevocation
+        lastSeenCommandRevocation = commandRevocation
+        let maxCarbsChanged = settingsManager.settings.maxCarbs != previousMaxCarbs
+        previousMaxCarbs = settingsManager.settings.maxCarbs
 
         // Update stored values
         units = currentUnits
@@ -1270,12 +1306,20 @@ extension BaseGarminManager: SettingsObserver {
                 debug(.watch, "Garmin watchface data enabled, sending update")
             }
             triggerWatchStateUpdate(triggeredBy: "Settings")
+        } else if commandSettingsChanged {
+            triggerWatchStateUpdate(triggeredBy: "CommandSettings")
         } else if unitsChanged || displayAttributesChanged || colorSchemeChanged {
             // Throttle other settings changes in case user makes multiple changes
             if debugWatchState {
                 debug(.watch, "Garmin display settings changed, scheduling update")
             }
             sendSettingsUpdateThrottled()
+        }
+
+        // the complication builds its menu and pickers from these; max bolus and bolus increment live
+        // outside TrioSettings and reach it with the next preset request
+        if commandSettingsChanged || maxCarbsChanged {
+            pushPresetsToComplications(triggeredBy: "CommandSettings")
         }
 
         // Store current Garmin settings for next comparison
