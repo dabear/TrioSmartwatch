@@ -63,4 +63,8 @@ enum WatchMessageKeys {
     static let forecastConeMin = "forecastConeMin"
     static let forecastConeMax = "forecastConeMax"
     static let forecastLines = "forecastLines"
+
+    // Garmin v1 Envelope Keys
+    static let protocolVersion = "v"
+    static let request = "req"
 }
