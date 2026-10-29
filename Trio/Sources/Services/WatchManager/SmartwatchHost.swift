@@ -61,6 +61,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @Injected() private var adjustmentManager: AdjustmentManager!
     @Injected() private var overrideStorage: OverrideStorage!
     @Injected() private var tempTargetStorage: TempTargetsStorage!
+    @Injected() private var carbsStorage: CarbsStorage!
 
     @PersistedProperty(key: "SmartwatchManagerState") private var rawSmartwatchManager: [String: Any]?
 
@@ -479,10 +480,107 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         log(manager, type, event.message, device: event.deviceIdentifier)
     }
 
-    /// Trio doesn't take boluses, carbs or mute from watch plugins yet.
+    /// Trio doesn't take boluses from watch plugins yet.
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus _: SmartwatchBolusRequest) async throws -> Double {
         log(manager, .error, "Bolus request from the watch refused: Trio doesn't take boluses from watch plugins")
         throw SmartwatchBolusError.notAllowed
+    }
+
+    /// The longest mute a watch can ask for.
+    static let maximumMuteDuration: TimeInterval = 4 * 60 * 60
+
+    /// Snoozes Trio's alerts like every other snooze surface, for at most 4 hours.
+    /// Critical alerts still sound, as for any snooze.
+    func smartwatchManager(_ manager: SmartwatchManager, requestAlertMute duration: TimeInterval) async throws -> Date {
+        log(manager, .receive, String(format: "Mute request: %.0f min", duration / 60))
+        if let refusal = refusal(for: manager, capability: .remoteMute, isAllowed: UserDefaults.standard.allowSmartwatchMute) {
+            log(manager, .error, "Mute request rejected: notAllowed (\(refusal))")
+            throw SmartwatchAlertMuteError.notAllowed
+        }
+        guard duration.isFinite, duration > 0 else {
+            log(manager, .error, "Mute request rejected: invalid duration")
+            throw SmartwatchAlertMuteError.notAllowed
+        }
+        let muteDuration = min(duration, Self.maximumMuteDuration)
+        await trioAlertManager.applySnooze(for: muteDuration)
+        let end = Date().addingTimeInterval(muteDuration)
+        log(manager, .delegateResponse, String(format: "Alerts snoozed from the watch for %.0f min", muteDuration / 60))
+        return end
+    }
+
+    /// Minimum time between carb entries from the watch.
+    static let minimumCarbInterval: TimeInterval = 15 * 60
+
+    /// Adds a carb entry like a remote meal: within Max Carbs, for requests
+    /// confirmed in the last 30 seconds, and at most one every 15 minutes.
+    func smartwatchManager(
+        _ manager: SmartwatchManager,
+        requestCarbEntry request: SmartwatchCarbEntryRequest
+    ) async throws -> Double {
+        let grams = request.grams
+        log(
+            manager,
+            .receive,
+            String(format: "Carb entry request: %.0f g, confirmed at %@", grams, String(describing: request.requestedAt))
+        )
+        if let refusal = refusal(for: manager, capability: .remoteCarbs, isAllowed: UserDefaults.standard.allowSmartwatchCarbs) {
+            log(manager, .error, "Carb entry request rejected: notAllowed (\(refusal))")
+            throw SmartwatchCarbEntryError.notAllowed
+        }
+        let age = Date().timeIntervalSince(request.requestedAt)
+        guard age <= Self.maximumRequestAge, age >= -Self.maximumClockSkew else {
+            log(manager, .error, String(format: "Carb entry request rejected: expiredRequest (confirmed %.0f s ago)", age))
+            throw SmartwatchCarbEntryError.expiredRequest
+        }
+        let maxCarbs = Double(truncating: settingsManager.settings.maxCarbs as NSNumber)
+        guard grams.isFinite, grams > 0, grams <= maxCarbs else {
+            log(
+                manager,
+                .error,
+                String(format: "Carb entry request rejected: %.0f g is not between 0 and Max Carbs (%.0f g)", grams, maxCarbs)
+            )
+            throw SmartwatchCarbEntryError.failed("invalid amount")
+        }
+        // Take the slot before storing, so a resend that arrives meanwhile is
+        // rate limited instead of adding the carbs a second time.
+        let slot: Date? = await MainActor.run {
+            let previous = UserDefaults.standard.lastSmartwatchCarbEntry
+            if let previous, Date().timeIntervalSince(previous) < Self.minimumCarbInterval {
+                return nil
+            }
+            UserDefaults.standard.lastSmartwatchCarbEntry = Date()
+            return previous ?? .distantPast
+        }
+        guard let previousEntry = slot else {
+            log(manager, .error, "Carb entry request rejected: rateLimited (one every 15 minutes)")
+            throw SmartwatchCarbEntryError.rateLimited
+        }
+        do {
+            let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: Date())
+            try await carbsStorage.storeCarbs([entry], areFetchedFromRemote: false)
+        } catch {
+            await MainActor.run {
+                UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry == .distantPast ? nil : previousEntry
+            }
+            log(manager, .error, "Watch carb entry failed: \(error)")
+            throw SmartwatchCarbEntryError.failed(String(describing: error))
+        }
+        log(manager, .delegateResponse, String(format: "Watch carb entry of %.0f g added", grams))
+        Task { @MainActor in self.refresh() }
+        return grams
+    }
+
+    /// Why a remote action from this watch isn't allowed, or nil when it is.
+    private func refusal(for manager: SmartwatchManager, capability: SmartwatchCapabilities, isAllowed: Bool) -> String? {
+        let isCurrentWatch = smartwatchManager.map { ($0 as AnyObject) === (manager as AnyObject) } ?? false
+        if !isCurrentWatch {
+            return "the request isn't from the current watch"
+        } else if !manager.effectiveCapabilities.contains(capability) {
+            return "this watch doesn't declare \(capability)"
+        } else if !isAllowed {
+            return "it isn't allowed in the Watch settings"
+        }
+        return nil
     }
 
     func smartwatchManager(_ manager: SmartwatchManager, requestOverride request: SmartwatchOverrideRequest) async throws {
@@ -534,17 +632,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         case .cancel: "end the running one"
         }
         log(manager, .receive, "\(kind) request: \(description), confirmed at \(requestedAt)")
-        let isCurrentWatch = smartwatchManager.map { ($0 as AnyObject) === (manager as AnyObject) } ?? false
-        let refusal: String? = if !isCurrentWatch {
-            "the request isn't from the current watch"
-        } else if !manager.effectiveCapabilities.contains(capability) {
-            "this watch doesn't declare \(capability)"
-        } else if !isAllowed {
-            "it isn't allowed in the Watch settings"
-        } else {
-            nil
-        }
-        if let refusal {
+        if let refusal = refusal(for: manager, capability: capability, isAllowed: isAllowed) {
             log(manager, .error, "\(kind) request rejected: notAllowed (\(refusal))")
             throw SmartwatchPresetError.notAllowed
         }
@@ -578,15 +666,30 @@ extension UserDefaults {
     static let allowSmartwatchOverridesKey = "Trio.smartwatch.allowOverrides"
     /// Whether a watch plugin with `.remoteTempTarget` may start and end temp targets. Off by default.
     static let allowSmartwatchTempTargetsKey = "Trio.smartwatch.allowTempTargets"
+    /// Whether a watch plugin with `.remoteMute` may snooze Trio's alerts. Off by default.
+    static let allowSmartwatchMuteKey = "Trio.smartwatch.allowMute"
+    /// Whether a watch plugin with `.remoteCarbs` may add carb entries. Off by default.
+    static let allowSmartwatchCarbsKey = "Trio.smartwatch.allowCarbs"
+    private static let lastSmartwatchCarbEntryKey = "Trio.smartwatch.lastCarbEntry"
 
     var allowSmartwatchOverrides: Bool { bool(forKey: Self.allowSmartwatchOverridesKey) }
     var allowSmartwatchTempTargets: Bool { bool(forKey: Self.allowSmartwatchTempTargetsKey) }
+    var allowSmartwatchMute: Bool { bool(forKey: Self.allowSmartwatchMuteKey) }
+    var allowSmartwatchCarbs: Bool { bool(forKey: Self.allowSmartwatchCarbsKey) }
+
+    /// When the last carb entry from the watch was added, for its rate limit.
+    var lastSmartwatchCarbEntry: Date? {
+        get { object(forKey: Self.lastSmartwatchCarbEntryKey) as? Date }
+        set { set(newValue, forKey: Self.lastSmartwatchCarbEntryKey) }
+    }
 
     /// Turns the permissions off, so a new watch plugin never inherits what the
     /// user granted another one.
     func resetSmartwatchPermissions() {
         set(false, forKey: Self.allowSmartwatchOverridesKey)
         set(false, forKey: Self.allowSmartwatchTempTargetsKey)
+        set(false, forKey: Self.allowSmartwatchMuteKey)
+        set(false, forKey: Self.allowSmartwatchCarbsKey)
     }
 }
 

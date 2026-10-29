@@ -13,6 +13,8 @@ struct WatchConfigSmartwatchRows: View {
     @State private var revision = 0
     @AppStorage(UserDefaults.allowSmartwatchOverridesKey) private var allowOverrides = false
     @AppStorage(UserDefaults.allowSmartwatchTempTargetsKey) private var allowTempTargets = false
+    @AppStorage(UserDefaults.allowSmartwatchMuteKey) private var allowMute = false
+    @AppStorage(UserDefaults.allowSmartwatchCarbsKey) private var allowCarbs = false
 
     private var host: SmartwatchHost { resolver.resolve(SmartwatchHost.self)! }
 
@@ -34,8 +36,14 @@ struct WatchConfigSmartwatchRows: View {
                 Button { sheet = .settings } label: {
                     row(title: manager.localizedTitle, image: manager.smallImage)
                 }
-                // Only for a watch that can start presets; off by default and
+                // Only for a watch that offers the action; off by default and
                 // turned off when the watch is removed or replaced.
+                if manager.effectiveCapabilities.contains(.remoteMute) {
+                    Toggle(String(localized: "Allow Snooze from Watch"), isOn: $allowMute)
+                }
+                if manager.effectiveCapabilities.contains(.remoteCarbs) {
+                    Toggle(String(localized: "Allow Carbs from Watch"), isOn: $allowCarbs)
+                }
                 if manager.effectiveCapabilities.contains(.remoteOverride) {
                     Toggle(String(localized: "Allow Overrides from Watch"), isOn: $allowOverrides)
                 }
