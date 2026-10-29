@@ -1,6 +1,7 @@
 [submodule "LoopKit"]
 	path = LoopKit
-	url = https://github.com/loopandlearn/LoopKit.git
+	url = https://github.com/dabear/LoopKit.git
+	branch = trio-smartwatch-manager
 [submodule "CGMBLEKit"]
 	path = CGMBLEKit
 	url = https://github.com/loopandlearn/CGMBLEKit.git
@@ -52,3 +53,7 @@
 [submodule "SyaiKit"]
 	path = SyaiKit
 	url = https://github.com/nightscout/SyaiKit
+[submodule "LupedSmartwatchKit"]
+	path = LupedSmartwatchKit
+	url = https://github.com/dabear/LupedSmartwatchKit.git
+	branch = smartwatch-manager
