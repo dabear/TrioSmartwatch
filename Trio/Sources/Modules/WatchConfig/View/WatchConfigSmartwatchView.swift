@@ -11,6 +11,8 @@ struct WatchConfigSmartwatchRows: View {
 
     @State private var sheet: Sheet?
     @State private var revision = 0
+    @AppStorage(UserDefaults.allowSmartwatchOverridesKey) private var allowOverrides = false
+    @AppStorage(UserDefaults.allowSmartwatchTempTargetsKey) private var allowTempTargets = false
 
     private var host: SmartwatchHost { resolver.resolve(SmartwatchHost.self)! }
 
@@ -31,6 +33,14 @@ struct WatchConfigSmartwatchRows: View {
             if let manager = host.smartwatchManager {
                 Button { sheet = .settings } label: {
                     row(title: manager.localizedTitle, image: manager.smallImage)
+                }
+                // Only for a watch that can start presets; off by default and
+                // turned off when the watch is removed or replaced.
+                if manager.effectiveCapabilities.contains(.remoteOverride) {
+                    Toggle(String(localized: "Allow Overrides from Watch"), isOn: $allowOverrides)
+                }
+                if manager.effectiveCapabilities.contains(.remoteTempTarget) {
+                    Toggle(String(localized: "Allow Temp Targets from Watch"), isOn: $allowTempTargets)
                 }
             } else {
                 ForEach(host.availableSmartwatchManagers, id: \.identifier) { descriptor in

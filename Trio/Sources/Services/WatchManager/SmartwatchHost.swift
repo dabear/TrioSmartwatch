@@ -58,6 +58,9 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @Injected() private var trioAlertManager: TrioAlertManager!
     @Injected() private var deviceLogStore: DeviceLogStore!
     @Injected() private var broadcaster: Broadcaster!
+    @Injected() private var adjustmentManager: AdjustmentManager!
+    @Injected() private var overrideStorage: OverrideStorage!
+    @Injected() private var tempTargetStorage: TempTargetsStorage!
 
     @PersistedProperty(key: "SmartwatchManagerState") private var rawSmartwatchManager: [String: Any]?
 
@@ -190,6 +193,15 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
             .store(in: &subscriptions)
+
+        for entity in ["OverrideStored", "TempTargetStored"] {
+            CoreDataStack.shared.entityChangePublisher
+                .receive(on: coreDataQueue)
+                .filteredByEntityName(entity)
+                .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+                .sink { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
+                .store(in: &subscriptions)
+        }
     }
 
     /// Sends the current snapshot even if unchanged, for a new watch manager or
@@ -238,6 +250,12 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             glucose: readings.last,
             glucoseHistory: capabilities.contains(.history) ? readings : []
         )
+        if capabilities.contains(.remoteOverride) {
+            snapshot.overridePresets = try await overridePresets()
+        }
+        if capabilities.contains(.remoteTempTarget) {
+            snapshot.tempTargetPresets = try await tempTargetPresets()
+        }
         guard capabilities.contains(.loopStatus) || capabilities.contains(.therapy) else { return snapshot }
 
         let determination = try await latestDetermination()
@@ -285,6 +303,46 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
                     milligramsPerDeciliter: Double(stored.glucose),
                     trend: stored.direction.flatMap { BloodGlucose.Direction(from: $0) }?.smartwatchTrend,
                     wasUserEntered: stored.isManual
+                )
+            }
+        }
+    }
+
+    /// Trio's override presets; `enabled` marks the running one. Durations are stored in minutes.
+    private func overridePresets() async throws -> [SmartwatchPreset] {
+        let ids = try await overrideStorage.fetchForOverridePresets()
+        let context = CoreDataStack.shared.newTaskContext()
+        context.name = "smartwatchOverridePresets"
+        let rows: [OverrideStored] = try await CoreDataStack.shared.getNSManagedObject(with: ids, context: context)
+        return await context.perform {
+            rows.compactMap { row in
+                guard let id = row.id, let name = row.name else { return nil }
+                let minutes = row.duration.map { Double(truncating: $0) } ?? 0
+                return SmartwatchPreset(
+                    id: id,
+                    name: name,
+                    isActive: row.enabled,
+                    duration: row.indefinite || minutes <= 0 ? nil : minutes * 60
+                )
+            }
+        }
+    }
+
+    /// Trio's temp target presets; `enabled` marks the running one. Durations are stored in minutes.
+    private func tempTargetPresets() async throws -> [SmartwatchPreset] {
+        let ids = try await tempTargetStorage.fetchForTempTargetPresets()
+        let context = CoreDataStack.shared.newTaskContext()
+        context.name = "smartwatchTempTargetPresets"
+        let rows: [TempTargetStored] = try await CoreDataStack.shared.getNSManagedObject(with: ids, context: context)
+        return await context.perform {
+            rows.compactMap { row in
+                guard let id = row.id, let name = row.name else { return nil }
+                let minutes = row.duration.map { Double(truncating: $0) } ?? 0
+                return SmartwatchPreset(
+                    id: id.uuidString,
+                    name: name,
+                    isActive: row.enabled,
+                    duration: minutes > 0 ? minutes * 60 : nil
                 )
             }
         }
@@ -400,6 +458,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
     func smartwatchManagerWantsDeletion(_ manager: SmartwatchManager) async {
         await MainActor.run {
             debug(.watch, "Watch manager \(manager.pluginIdentifier) wants deletion")
+            UserDefaults.standard.resetSmartwatchPermissions()
             smartwatchManager = nil
         }
     }
@@ -420,10 +479,114 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         log(manager, type, event.message, device: event.deviceIdentifier)
     }
 
-    /// Trio doesn't take remote actions from watch plugins yet.
+    /// Trio doesn't take boluses, carbs or mute from watch plugins yet.
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus _: SmartwatchBolusRequest) async throws -> Double {
         log(manager, .error, "Bolus request from the watch refused: Trio doesn't take boluses from watch plugins")
         throw SmartwatchBolusError.notAllowed
+    }
+
+    func smartwatchManager(_ manager: SmartwatchManager, requestOverride request: SmartwatchOverrideRequest) async throws {
+        try await handlePresetRequest(
+            kind: "Override",
+            action: request.action,
+            requestedAt: request.requestedAt,
+            capability: .remoteOverride,
+            isAllowed: UserDefaults.standard.allowSmartwatchOverrides,
+            from: manager,
+            activate: { try await self.adjustmentManager.activateOverride(.presetID($0), source: .watch) },
+            cancel: { try await self.adjustmentManager.cancelOverride(source: .watch) }
+        )
+    }
+
+    func smartwatchManager(_ manager: SmartwatchManager, requestTempTarget request: SmartwatchTempTargetRequest) async throws {
+        try await handlePresetRequest(
+            kind: "Temp target",
+            action: request.action,
+            requestedAt: request.requestedAt,
+            capability: .remoteTempTarget,
+            isAllowed: UserDefaults.standard.allowSmartwatchTempTargets,
+            from: manager,
+            activate: { try await self.adjustmentManager.activateTempTarget(.presetID($0), source: .watch) },
+            cancel: { try await self.adjustmentManager.cancelTempTarget(source: .watch) }
+        )
+    }
+
+    /// How long a request from the watch stays valid after the user confirmed it.
+    static let maximumRequestAge: TimeInterval = 30
+    /// How far ahead of the phone the watch's clock may run.
+    static let maximumClockSkew: TimeInterval = 5
+
+    /// Starts or ends a preset through the same path as Trio's Apple Watch app, only
+    /// for the current watch, with the capability and the user's permission, and for
+    /// requests confirmed in the last 30 seconds.
+    private func handlePresetRequest(
+        kind: String,
+        action: SmartwatchPresetAction,
+        requestedAt: Date,
+        capability: SmartwatchCapabilities,
+        isAllowed: Bool,
+        from manager: SmartwatchManager,
+        activate: (String) async throws -> AdjustmentOutcome,
+        cancel: () async throws -> AdjustmentOutcome
+    ) async throws {
+        let description = switch action {
+        case let .activate(presetID): "start preset \(presetID)"
+        case .cancel: "end the running one"
+        }
+        log(manager, .receive, "\(kind) request: \(description), confirmed at \(requestedAt)")
+        let isCurrentWatch = smartwatchManager.map { ($0 as AnyObject) === (manager as AnyObject) } ?? false
+        let refusal: String? = if !isCurrentWatch {
+            "the request isn't from the current watch"
+        } else if !manager.effectiveCapabilities.contains(capability) {
+            "this watch doesn't declare \(capability)"
+        } else if !isAllowed {
+            "it isn't allowed in the Watch settings"
+        } else {
+            nil
+        }
+        if let refusal {
+            log(manager, .error, "\(kind) request rejected: notAllowed (\(refusal))")
+            throw SmartwatchPresetError.notAllowed
+        }
+        let age = Date().timeIntervalSince(requestedAt)
+        guard age <= Self.maximumRequestAge, age >= -Self.maximumClockSkew else {
+            log(manager, .error, String(format: "%@ request rejected: expiredRequest (confirmed %.0f s ago)", kind, age))
+            throw SmartwatchPresetError.expiredRequest
+        }
+        do {
+            switch action {
+            case let .activate(presetID):
+                let outcome = try await activate(presetID)
+                log(manager, .delegateResponse, "\(kind) \"\(outcome.started?.name ?? presetID)\" started from the watch")
+            case .cancel:
+                _ = try await cancel()
+                log(manager, .delegateResponse, "\(kind) ended from the watch")
+            }
+        } catch AdjustmentError.presetNotFound {
+            log(manager, .error, "\(kind) request rejected: unknownPreset")
+            throw SmartwatchPresetError.unknownPreset
+        } catch {
+            log(manager, .error, "\(kind) request from the watch failed: \(error)")
+            throw SmartwatchPresetError.failed(String(describing: error))
+        }
+        Task { @MainActor in self.refresh() }
+    }
+}
+
+extension UserDefaults {
+    /// Whether a watch plugin with `.remoteOverride` may start and end overrides. Off by default.
+    static let allowSmartwatchOverridesKey = "Trio.smartwatch.allowOverrides"
+    /// Whether a watch plugin with `.remoteTempTarget` may start and end temp targets. Off by default.
+    static let allowSmartwatchTempTargetsKey = "Trio.smartwatch.allowTempTargets"
+
+    var allowSmartwatchOverrides: Bool { bool(forKey: Self.allowSmartwatchOverridesKey) }
+    var allowSmartwatchTempTargets: Bool { bool(forKey: Self.allowSmartwatchTempTargetsKey) }
+
+    /// Turns the permissions off, so a new watch plugin never inherits what the
+    /// user granted another one.
+    func resetSmartwatchPermissions() {
+        set(false, forKey: Self.allowSmartwatchOverridesKey)
+        set(false, forKey: Self.allowSmartwatchTempTargetsKey)
     }
 }
 
@@ -432,6 +595,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
 extension BaseSmartwatchHost: SmartwatchManagerOnboardingDelegate {
     func smartwatchManagerOnboarding(didCreateSmartwatchManager manager: SmartwatchManagerUI) {
         debug(.watch, "Watch manager \(manager.pluginIdentifier) created")
+        UserDefaults.standard.resetSmartwatchPermissions()
         smartwatchManager = manager
     }
 
