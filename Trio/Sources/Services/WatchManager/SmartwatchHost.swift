@@ -62,6 +62,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @Injected() private var overrideStorage: OverrideStorage!
     @Injected() private var tempTargetStorage: TempTargetsStorage!
     @Injected() private var carbsStorage: CarbsStorage!
+    @Injected() private var bolusCalculationManager: BolusCalculationManager!
 
     @PersistedProperty(key: "SmartwatchManagerState") private var rawSmartwatchManager: [String: Any]?
 
@@ -72,6 +73,8 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     /// Main-actor state for sending snapshots.
     @MainActor private var lastSentSnapshot: SmartwatchStatusSnapshot?
     @MainActor private var updateGeneration = 0
+    /// Hands out the bolus context and tracks the watch bolus being delivered.
+    @MainActor private var bolusContextIssuer = SmartwatchBolusContextIssuer()
 
     private(set) var smartwatchManager: SmartwatchManagerUI? {
         didSet {
@@ -242,6 +245,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         var sensitivityRatio: Double?
         var target: Double?
         var scheduledBasal: Double?
+        var minPredBG: Decimal?
     }
 
     @MainActor private func makeSnapshot(capabilities: SmartwatchCapabilities) async throws -> SmartwatchStatusSnapshot {
@@ -257,9 +261,16 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         if capabilities.contains(.remoteTempTarget) {
             snapshot.tempTargetPresets = try await tempTargetPresets()
         }
-        guard capabilities.contains(.loopStatus) || capabilities.contains(.therapy) else { return snapshot }
+        guard capabilities.contains(.loopStatus) || capabilities.contains(.therapy) || capabilities.contains(.remoteBolus)
+        else { return snapshot }
 
         let determination = try await latestDetermination()
+        if capabilities.contains(.remoteBolus) {
+            snapshot.bolusContext = await currentBolusContext(
+                minPredBG: determination?.minPredBG,
+                latestGlucoseDate: readings.last?.date
+            )
+        }
         if capabilities.contains(.loopStatus) {
             snapshot.insulinOnBoard = iobService.currentIOB.map { Double(truncating: $0 as NSDecimalNumber) }
             snapshot.carbsOnBoard = determination?.cob
@@ -307,6 +318,89 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
                 )
             }
         }
+    }
+
+    // MARK: - Watch bolus
+
+    /// The recommendation Trio's Apple Watch app shows for a bolus without carbs.
+    @MainActor private func currentBolusContext(minPredBG: Decimal?, latestGlucoseDate: Date?) async -> SmartwatchBolusContext {
+        let result = await bolusCalculationManager.handleBolusCalculation(
+            carbs: 0,
+            useFattyMealCorrection: false,
+            useSuperBolus: false,
+            lastLoopDate: apsManager.lastLoopDate,
+            minPredBG: minPredBG ?? 54,
+            simulatedCOB: nil,
+            isBackdated: false
+        )
+        let inputs = SmartwatchBolusContextIssuer.Inputs(
+            recommendedBolus: Double(truncating: result.insulinCalculated as NSNumber),
+            maximumBolus: Double(truncating: settingsManager.pumpSettings.maxBolus as NSNumber),
+            supportedBolusVolumes: deviceDataManager.pumpManager?.supportedBolusVolumes ?? [],
+            latestGlucoseDate: latestGlucoseDate
+        )
+        return bolusContextIssuer.context(for: inputs, now: Date())
+    }
+
+    /// Delivers a bolus the plugin authenticated, if LoopKit's `SmartwatchBolusPolicy`
+    /// allows it, through the same path as Trio's Apple Watch app.
+    @MainActor private func handleBolusRequest(
+        _ request: SmartwatchBolusRequest,
+        from manager: SmartwatchManager
+    ) async throws -> Double {
+        log(manager, .receive, String(
+            format: "%@ request: %.3f U, confirmed at %@, context %@",
+            request.isForced ? "Forced bolus (recommendation not checked)" : "Bolus",
+            request.units,
+            String(describing: request.requestedAt),
+            request.contextToken.uuidString
+        ))
+        if bolusContextIssuer.isDelivering(request) {
+            log(manager, .error, "Bolus request answered with inProgress: the same bolus is still being delivered")
+            throw SmartwatchBolusError.inProgress
+        }
+        let refusal = refusal(for: manager, capability: .remoteBolus, isAllowed: UserDefaults.standard.allowSmartwatchBolus)
+        let pumpManager = deviceDataManager.pumpManager
+        let policy = SmartwatchBolusPolicy(
+            isAllowed: refusal == nil,
+            currentContext: bolusContextIssuer.current,
+            recentDeliveries: UserDefaults.standard.smartwatchBolusDeliveries,
+            roundToSupportedVolume: { pumpManager?.roundToSupportedBolusVolume(units: $0) ?? $0 }
+        )
+        let units: Double
+        switch policy.evaluate(request, now: Date()) {
+        case let .failure(error):
+            let reason = error == .notAllowed ? " (\(refusal ?? ""))" : ""
+            log(manager, .error, "Bolus request rejected: \(error)\(reason)")
+            throw error
+        case let .success(allowed):
+            units = allowed
+        }
+
+        bolusContextIssuer.beginDelivery(of: request)
+        defer { bolusContextIssuer.endDelivery() }
+        log(manager, .delegate, String(format: "Delivering watch bolus of %.3f U", units))
+
+        // enactBolus answers through its callback before it returns.
+        let outcome = BolusOutcome()
+        await apsManager.enactBolus(amount: units, isSMB: false) { success, message in
+            outcome.success = success
+            outcome.message = message
+        }
+        guard outcome.success else {
+            log(manager, .error, "Watch bolus delivery failed: \(outcome.message)")
+            refresh()
+            throw SmartwatchBolusError.deliveryFailed(outcome.message)
+        }
+        UserDefaults.standard.smartwatchBolusDeliveries += [SmartwatchBolusPolicy.Delivery(date: Date(), units: units)]
+        log(manager, .delegateResponse, String(format: "Watch bolus of %.3f U delivered", units))
+        refresh()
+        return units
+    }
+
+    private final class BolusOutcome: @unchecked Sendable {
+        var success = false
+        var message = "no answer from the pump"
     }
 
     /// Trio's override presets; `enabled` marks the running one. Durations are stored in minutes.
@@ -371,7 +465,8 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
                 insulinSensitivity: double(determination.insulinSensitivity),
                 sensitivityRatio: double(determination.sensitivityRatio),
                 target: double(determination.currentTarget),
-                scheduledBasal: double(determination.scheduledBasal)
+                scheduledBasal: double(determination.scheduledBasal),
+                minPredBG: determination.minPredBGFromReason
             )
         }
     }
@@ -480,10 +575,8 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         log(manager, type, event.message, device: event.deviceIdentifier)
     }
 
-    /// Trio doesn't take boluses from watch plugins yet.
-    func smartwatchManager(_ manager: SmartwatchManager, requestBolus _: SmartwatchBolusRequest) async throws -> Double {
-        log(manager, .error, "Bolus request from the watch refused: Trio doesn't take boluses from watch plugins")
-        throw SmartwatchBolusError.notAllowed
+    func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double {
+        try await handleBolusRequest(request, from: manager)
     }
 
     /// The longest mute a watch can ask for.
@@ -508,11 +601,8 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         return end
     }
 
-    /// Minimum time between carb entries from the watch.
-    static let minimumCarbInterval: TimeInterval = 15 * 60
-
-    /// Adds a carb entry like a remote meal: within Max Carbs, for requests
-    /// confirmed in the last 30 seconds, and at most one every 15 minutes.
+    /// Adds a carb entry like a remote meal, if LoopKit's `SmartwatchCarbEntryPolicy`
+    /// allows it, within Max Carbs.
     func smartwatchManager(
         _ manager: SmartwatchManager,
         requestCarbEntry request: SmartwatchCarbEntryRequest
@@ -523,44 +613,30 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             .receive,
             String(format: "Carb entry request: %.0f g, confirmed at %@", grams, String(describing: request.requestedAt))
         )
-        if let refusal = refusal(for: manager, capability: .remoteCarbs, isAllowed: UserDefaults.standard.allowSmartwatchCarbs) {
-            log(manager, .error, "Carb entry request rejected: notAllowed (\(refusal))")
-            throw SmartwatchCarbEntryError.notAllowed
-        }
-        let age = Date().timeIntervalSince(request.requestedAt)
-        guard age <= Self.maximumRequestAge, age >= -Self.maximumClockSkew else {
-            log(manager, .error, String(format: "Carb entry request rejected: expiredRequest (confirmed %.0f s ago)", age))
-            throw SmartwatchCarbEntryError.expiredRequest
-        }
+        let refusal = refusal(for: manager, capability: .remoteCarbs, isAllowed: UserDefaults.standard.allowSmartwatchCarbs)
         let maxCarbs = Double(truncating: settingsManager.settings.maxCarbs as NSNumber)
-        guard grams.isFinite, grams > 0, grams <= maxCarbs else {
-            log(
-                manager,
-                .error,
-                String(format: "Carb entry request rejected: %.0f g is not between 0 and Max Carbs (%.0f g)", grams, maxCarbs)
-            )
-            throw SmartwatchCarbEntryError.failed("invalid amount")
-        }
-        // Take the slot before storing, so a resend that arrives meanwhile is
-        // rate limited instead of adding the carbs a second time.
-        let slot: Date? = await MainActor.run {
+        // Check and take the rate-limit slot together, before storing, so a resend
+        // that arrives meanwhile is rate limited instead of added twice.
+        let outcome: (Result<Double, SmartwatchCarbEntryError>, Date?) = await MainActor.run {
             let previous = UserDefaults.standard.lastSmartwatchCarbEntry
-            if let previous, Date().timeIntervalSince(previous) < Self.minimumCarbInterval {
-                return nil
+            let policy = SmartwatchCarbEntryPolicy(isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous)
+            let result = policy.evaluate(request, now: Date())
+            if case .success = result {
+                UserDefaults.standard.lastSmartwatchCarbEntry = Date()
             }
-            UserDefaults.standard.lastSmartwatchCarbEntry = Date()
-            return previous ?? .distantPast
+            return (result, previous)
         }
-        guard let previousEntry = slot else {
-            log(manager, .error, "Carb entry request rejected: rateLimited (one every 15 minutes)")
-            throw SmartwatchCarbEntryError.rateLimited
+        let previousEntry = outcome.1
+        if case let .failure(error) = outcome.0 {
+            log(manager, .error, "Carb entry request rejected: \(error)\(refusal.map { " (\($0))" } ?? "")")
+            throw error
         }
         do {
             let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: Date())
             try await carbsStorage.storeCarbs([entry], areFetchedFromRemote: false)
         } catch {
             await MainActor.run {
-                UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry == .distantPast ? nil : previousEntry
+                UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry
             }
             log(manager, .error, "Watch carb entry failed: \(error)")
             throw SmartwatchCarbEntryError.failed(String(describing: error))
@@ -609,11 +685,6 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         )
     }
 
-    /// How long a request from the watch stays valid after the user confirmed it.
-    static let maximumRequestAge: TimeInterval = 30
-    /// How far ahead of the phone the watch's clock may run.
-    static let maximumClockSkew: TimeInterval = 5
-
     /// Starts or ends a preset through the same path as Trio's Apple Watch app, only
     /// for the current watch, with the capability and the user's permission, and for
     /// requests confirmed in the last 30 seconds.
@@ -637,7 +708,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             throw SmartwatchPresetError.notAllowed
         }
         let age = Date().timeIntervalSince(requestedAt)
-        guard age <= Self.maximumRequestAge, age >= -Self.maximumClockSkew else {
+        guard SmartwatchBolusPolicy.Limits.standard.isFresh(requestedAt, now: Date()) else {
             log(manager, .error, String(format: "%@ request rejected: expiredRequest (confirmed %.0f s ago)", kind, age))
             throw SmartwatchPresetError.expiredRequest
         }
@@ -670,12 +741,28 @@ extension UserDefaults {
     static let allowSmartwatchMuteKey = "Trio.smartwatch.allowMute"
     /// Whether a watch plugin with `.remoteCarbs` may add carb entries. Off by default.
     static let allowSmartwatchCarbsKey = "Trio.smartwatch.allowCarbs"
+    /// Whether a watch plugin with `.remoteBolus` may request boluses. Off by default.
+    static let allowSmartwatchBolusKey = "Trio.smartwatch.allowBolus"
+    private static let smartwatchBolusDeliveriesKey = "Trio.smartwatch.bolusDeliveries"
     private static let lastSmartwatchCarbEntryKey = "Trio.smartwatch.lastCarbEntry"
 
     var allowSmartwatchOverrides: Bool { bool(forKey: Self.allowSmartwatchOverridesKey) }
     var allowSmartwatchTempTargets: Bool { bool(forKey: Self.allowSmartwatchTempTargetsKey) }
     var allowSmartwatchMute: Bool { bool(forKey: Self.allowSmartwatchMuteKey) }
     var allowSmartwatchCarbs: Bool { bool(forKey: Self.allowSmartwatchCarbsKey) }
+    var allowSmartwatchBolus: Bool { bool(forKey: Self.allowSmartwatchBolusKey) }
+
+    /// Watch boluses delivered in the last 24 hours, kept across launches for the rate limits.
+    var smartwatchBolusDeliveries: [SmartwatchBolusPolicy.Delivery] {
+        get {
+            data(forKey: Self.smartwatchBolusDeliveriesKey)
+                .flatMap { try? JSONDecoder().decode([SmartwatchBolusPolicy.Delivery].self, from: $0) } ?? []
+        }
+        set {
+            let dayStart = Date().addingTimeInterval(-24 * 60 * 60)
+            set(try? JSONEncoder().encode(newValue.filter { $0.date > dayStart }), forKey: Self.smartwatchBolusDeliveriesKey)
+        }
+    }
 
     /// When the last carb entry from the watch was added, for its rate limit.
     var lastSmartwatchCarbEntry: Date? {
@@ -690,6 +777,7 @@ extension UserDefaults {
         set(false, forKey: Self.allowSmartwatchTempTargetsKey)
         set(false, forKey: Self.allowSmartwatchMuteKey)
         set(false, forKey: Self.allowSmartwatchCarbsKey)
+        set(false, forKey: Self.allowSmartwatchBolusKey)
     }
 }
 

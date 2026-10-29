@@ -15,6 +15,7 @@ struct WatchConfigSmartwatchRows: View {
     @AppStorage(UserDefaults.allowSmartwatchTempTargetsKey) private var allowTempTargets = false
     @AppStorage(UserDefaults.allowSmartwatchMuteKey) private var allowMute = false
     @AppStorage(UserDefaults.allowSmartwatchCarbsKey) private var allowCarbs = false
+    @AppStorage(UserDefaults.allowSmartwatchBolusKey) private var allowBolus = false
 
     private var host: SmartwatchHost { resolver.resolve(SmartwatchHost.self)! }
 
@@ -43,6 +44,9 @@ struct WatchConfigSmartwatchRows: View {
                 }
                 if manager.effectiveCapabilities.contains(.remoteCarbs) {
                     Toggle(String(localized: "Allow Carbs from Watch"), isOn: $allowCarbs)
+                }
+                if manager.effectiveCapabilities.contains(.remoteBolus) {
+                    Toggle(String(localized: "Allow Boluses from Watch"), isOn: $allowBolus)
                 }
                 if manager.effectiveCapabilities.contains(.remoteOverride) {
                     Toggle(String(localized: "Allow Overrides from Watch"), isOn: $allowOverrides)
