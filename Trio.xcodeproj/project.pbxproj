@@ -7,6 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9A3CCDA32C874DE6AB45F00D /* WatchCommandIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C44BB629194B2666EAC83 /* WatchCommandIntegrationTests.swift */; };
+		9A3C1EE99DC965899EC25C4F /* WatchCommandProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C0A1F620D72723F65D596 /* WatchCommandProcessorTests.swift */; };
+		9A3C4FC24B2DFEEB95911EDE /* WatchCommandProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF62E60DADFAC56F829E2 /* WatchCommandProcessor.swift */; };
+		9A3CD75136E1A66C2F49240C /* WatchCommandActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CA2079F4D0DB8B1684D0B /* WatchCommandActions.swift */; };
+		9A3CB4CA0FB381954EA4BA94 /* WatchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C78318D8159B851C0EC52 /* WatchCommand.swift */; };
+		9A3C034686E6B4AC8CE5E7D8 /* GarminManagerIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C4DF6510DE4DB0E1F1F3A /* GarminManagerIntegrationTests.swift */; };
+		9A3CF45C4133651CC90484F5 /* GarminMessageRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C0B63D2B89008769E452C /* GarminMessageRouterTests.swift */; };
+		9A3CA6DBA84BDF295314EAC5 /* GarminMessageRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF86D09F46856D09A2ED2 /* GarminMessageRouter.swift */; };
+		9A3CE4DF1D01738B99BBF795 /* WatchCommandPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C9B44D186FF8A7079468A /* WatchCommandPipelineTests.swift */; };
+		9A3C0ECD1617389255D168CF /* WatchCommandRequestCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C3CA768CF7D5036326306 /* WatchCommandRequestCacheTests.swift */; };
+		9A3C70FF5CD33060FE5626A7 /* WatchCommandTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C3F1091C03368A75DD96E /* WatchCommandTestDoubles.swift */; };
+		9A3C3B50509CE7ABFE2E3D1D /* WatchCommandRequestCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CA06D5CC8AB3491F284C1 /* WatchCommandRequestCache.swift */; };
+		9A3C76A08493CDC6FBF71373 /* WatchCommandPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C6BB18B32890597D63BD9 /* WatchCommandPipeline.swift */; };
+		9A3C151EF9FCECCF212ED730 /* WatchPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C1083145DAD9C2A662CE1 /* WatchPresets.swift */; };
 		03B15F4B3077CD4B00DFEBE4 /* SyaiKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 03B15F4A3077CD4B00DFEBE4 /* SyaiKit.framework */; };
 		03B15F4D3077CD5400DFEBE4 /* SyaiKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 03B15F4C3077CD5400DFEBE4 /* SyaiKitUI.framework */; };
 		03B15F4E3077CD6100DFEBE4 /* SyaiKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 03B15F4C3077CD5400DFEBE4 /* SyaiKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -1257,6 +1271,20 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		9A3C44BB629194B2666EAC83 /* WatchCommandIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandIntegrationTests.swift; sourceTree = "<group>"; };
+		9A3C0A1F620D72723F65D596 /* WatchCommandProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandProcessorTests.swift; sourceTree = "<group>"; };
+		9A3CF62E60DADFAC56F829E2 /* WatchCommandProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandProcessor.swift; sourceTree = "<group>"; };
+		9A3CA2079F4D0DB8B1684D0B /* WatchCommandActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandActions.swift; sourceTree = "<group>"; };
+		9A3C78318D8159B851C0EC52 /* WatchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommand.swift; sourceTree = "<group>"; };
+		9A3C4DF6510DE4DB0E1F1F3A /* GarminManagerIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarminManagerIntegrationTests.swift; sourceTree = "<group>"; };
+		9A3C0B63D2B89008769E452C /* GarminMessageRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarminMessageRouterTests.swift; sourceTree = "<group>"; };
+		9A3CF86D09F46856D09A2ED2 /* GarminMessageRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarminMessageRouter.swift; sourceTree = "<group>"; };
+		9A3C9B44D186FF8A7079468A /* WatchCommandPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandPipelineTests.swift; sourceTree = "<group>"; };
+		9A3C3CA768CF7D5036326306 /* WatchCommandRequestCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandRequestCacheTests.swift; sourceTree = "<group>"; };
+		9A3C3F1091C03368A75DD96E /* WatchCommandTestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandTestDoubles.swift; sourceTree = "<group>"; };
+		9A3CA06D5CC8AB3491F284C1 /* WatchCommandRequestCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandRequestCache.swift; sourceTree = "<group>"; };
+		9A3C6BB18B32890597D63BD9 /* WatchCommandPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchCommandPipeline.swift; sourceTree = "<group>"; };
+		9A3C1083145DAD9C2A662CE1 /* WatchPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchPresets.swift; sourceTree = "<group>"; };
 		03B15F4A3077CD4B00DFEBE4 /* SyaiKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = SyaiKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		03B15F4C3077CD5400DFEBE4 /* SyaiKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = SyaiKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A1E8522E7684C6AA742F6E4 /* HomeStateModel+QuickPickTreatments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeStateModel+QuickPickTreatments.swift"; sourceTree = "<group>"; };
@@ -2467,6 +2495,33 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9A3C6118713FEDFA9AD437CA /* WatchCommandTests */ = {
+			isa = PBXGroup;
+			children = (
+				9A3C44BB629194B2666EAC83 /* WatchCommandIntegrationTests.swift */,
+				9A3C0A1F620D72723F65D596 /* WatchCommandProcessorTests.swift */,
+				9A3C4DF6510DE4DB0E1F1F3A /* GarminManagerIntegrationTests.swift */,
+				9A3C0B63D2B89008769E452C /* GarminMessageRouterTests.swift */,
+				9A3C9B44D186FF8A7079468A /* WatchCommandPipelineTests.swift */,
+				9A3C3CA768CF7D5036326306 /* WatchCommandRequestCacheTests.swift */,
+				9A3C3F1091C03368A75DD96E /* WatchCommandTestDoubles.swift */,
+			);
+			path = WatchCommandTests;
+			sourceTree = "<group>";
+		};
+		9A3CC598A206D8D945713F97 /* WatchCommand */ = {
+			isa = PBXGroup;
+			children = (
+				9A3CF62E60DADFAC56F829E2 /* WatchCommandProcessor.swift */,
+				9A3CA2079F4D0DB8B1684D0B /* WatchCommandActions.swift */,
+				9A3C78318D8159B851C0EC52 /* WatchCommand.swift */,
+				9A3C1083145DAD9C2A662CE1 /* WatchPresets.swift */,
+				9A3CA06D5CC8AB3491F284C1 /* WatchCommandRequestCache.swift */,
+				9A3C6BB18B32890597D63BD9 /* WatchCommandPipeline.swift */,
+			);
+			path = WatchCommand;
+			sourceTree = "<group>";
+		};
 		0610F7D6D2EC00E3BA1569F0 /* ConfigEditor */ = {
 			isa = PBXGroup;
 			children = (
@@ -2905,6 +2960,7 @@
 				38E87406274F9AA500975559 /* UserNotifications */,
 				38E8754D275556E100975559 /* WatchManager */,
 				196DA87A7331DB0D3420E81B /* AppAttest */,
+				9A3CC598A206D8D945713F97 /* WatchCommand */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -3521,6 +3577,7 @@
 			isa = PBXGroup;
 			children = (
 				BDA25EE32D260CCF00035F34 /* AppleWatchManager.swift */,
+				9A3CF86D09F46856D09A2ED2 /* GarminMessageRouter.swift */,
 				CE94597D29E9E1EE0047C9C6 /* GarminManager.swift */,
 				C8DC9695DAFB6EA2C4A5B821 /* SmartwatchHost.swift */,
 			);
@@ -3564,6 +3621,7 @@
 				B015AFF62E600000000D7351 /* AdjustmentsTests */,
 				B015AFE62E500000000D7351 /* BolusSafetyTests */,
 				BD8FC0552D66187700B95AED /* CoreDataTests */,
+				9A3C6118713FEDFA9AD437CA /* WatchCommandTests */,
 				38FCF3F125E9028E0078B0D1 /* Info.plist */,
 				CEE9A65D2BBC9F6500EB5194 /* CalibrationsTests.swift */,
 				CA02000000000000000010C1 /* DeliveryLimitsSyncTests.swift */,
@@ -5832,6 +5890,13 @@
 				DD1745552C55CA6C00211FAC /* UnitsLimitsSettingsRootView.swift in Sources */,
 				CE94597E29E9E1EE0047C9C6 /* GarminManager.swift in Sources */,
 				E01885D82D856FBCC3C4EE4C /* SmartwatchHost.swift in Sources */,
+				9A3C4FC24B2DFEEB95911EDE /* WatchCommandProcessor.swift in Sources */,
+				9A3CD75136E1A66C2F49240C /* WatchCommandActions.swift in Sources */,
+				9A3CB4CA0FB381954EA4BA94 /* WatchCommand.swift in Sources */,
+				9A3C151EF9FCECCF212ED730 /* WatchPresets.swift in Sources */,
+				9A3CA6DBA84BDF295314EAC5 /* GarminMessageRouter.swift in Sources */,
+				9A3C3B50509CE7ABFE2E3D1D /* WatchCommandRequestCache.swift in Sources */,
+				9A3C76A08493CDC6FBF71373 /* WatchCommandPipeline.swift in Sources */,
 				3883583425EEB38000E024B2 /* PumpSettings.swift in Sources */,
 				38DAB280260CBB7F00F74C1A /* PumpView.swift in Sources */,
 				DDD1631C2C4C697400CD525A /* AddOverrideForm.swift in Sources */,
@@ -6630,6 +6695,13 @@
 				41740E936552456AAC0EDCC3 /* MaxIOBSuggestionTests.swift in Sources */,
 				41740E936552456AAC0EDBC3 /* DosingModeMigrationTests.swift in Sources */,
 				B015AFE52E500000000D7351 /* BolusSafetyValidatorTests.swift in Sources */,
+				9A3CCDA32C874DE6AB45F00D /* WatchCommandIntegrationTests.swift in Sources */,
+				9A3C1EE99DC965899EC25C4F /* WatchCommandProcessorTests.swift in Sources */,
+				9A3C034686E6B4AC8CE5E7D8 /* GarminManagerIntegrationTests.swift in Sources */,
+				9A3CF45C4133651CC90484F5 /* GarminMessageRouterTests.swift in Sources */,
+				9A3CE4DF1D01738B99BBF795 /* WatchCommandPipelineTests.swift in Sources */,
+				9A3C0ECD1617389255D168CF /* WatchCommandRequestCacheTests.swift in Sources */,
+				9A3C70FF5CD33060FE5626A7 /* WatchCommandTestDoubles.swift in Sources */,
 				BD8FC0712D661B0000B95AED /* TidepoolTherapySettingsTests.swift in Sources */,
 				CA03000000000000000010C2 /* AlertCatalogRegistryOmniFaultTests.swift in Sources */,
 				CD1235B000000000000000F2 /* TidepoolUploadSerializerTests.swift in Sources */,

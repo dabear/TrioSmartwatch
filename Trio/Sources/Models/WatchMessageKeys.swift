@@ -63,4 +63,18 @@ enum WatchMessageKeys {
     static let forecastConeMin = "forecastConeMin"
     static let forecastConeMax = "forecastConeMax"
     static let forecastLines = "forecastLines"
+
+    // Garmin v1 Envelope Keys
+    static let protocolVersion = "v"
+    static let request = "req"
+    static let presetName = "name"
+    static let presetIsEnabled = "isEnabled"
+    static let requestID = "requestId"
+    static let command = "command"
+    static let payload = "payload"
+    static let mealBolus = "mealBolus"
+    static let isCommandControlEnabled = "isCommandControlEnabled"
+    static let isBolusCommandEnabled = "isBolusCommandEnabled"
+    static let isCommandAppActive = "active"
+    static let commandApp = "owner"
 }

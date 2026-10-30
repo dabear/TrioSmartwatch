@@ -84,6 +84,41 @@ enum GarminWatchface: String, JSON, CaseIterable, Identifiable, Codable, Hashabl
     }
 }
 
+// MARK: - Garmin Command App
+
+/// Connect IQ watch app that sends commands next to a Trio or Swissalpine watchface.
+enum GarminWatchControls {
+    static let displayName = "Trio-WatchControls"
+    static let appUUID = UUID(uuidString: "d504737e-8315-48d4-b07e-4c421ffb6f54")
+}
+
+/// The one watch app allowed to send commands; with both command apps installed, both would otherwise prompt.
+/// Raw values are the `owner` the watch reads from the command app notice.
+enum GarminCommandApp: String {
+    case complication
+    case watchControls
+    case none
+
+    /// The watchface selection decides, since Complication then runs in the watchface slot.
+    init(_ settings: GarminWatchSettings) {
+        if settings.watchface == .complication {
+            self = .complication
+        } else {
+            self = settings.isCommandControlEnabled ? .watchControls : .none
+        }
+    }
+
+    var appUUID: UUID? {
+        switch self {
+        case .complication: return GarminWatchface.complication.watchfaceUUID
+        case .watchControls: return GarminWatchControls.appUUID
+        case .none: return nil
+        }
+    }
+
+    static let appUUIDs = Set([GarminWatchface.complication.watchfaceUUID, GarminWatchControls.appUUID].compactMap { $0 })
+}
+
 // MARK: - Garmin Datafield Setting
 
 /// Defines the available Garmin datafields with their associated UUIDs.
@@ -131,4 +166,42 @@ struct GarminWatchSettings: Codable, Hashable {
     var primaryAttributeChoice: GarminPrimaryAttributeChoice = .cob
     var secondaryAttributeChoice: GarminSecondaryAttributeChoice = .tbr
     var isWatchfaceDataEnabled: Bool = false
+    /// Master switch for state-changing watch commands; status and preset reads ignore it.
+    var isCommandControlEnabled: Bool = false
+    /// Allows bolus and meal+bolus commands; only effective while `isCommandControlEnabled` is on.
+    var isBolusCommandEnabled: Bool = false
+}
+
+extension GarminWatchSettings {
+    /// Keys missing from settings written by older versions keep their defaults, so commands stay off.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        if let watchface = try? container.decode(GarminWatchface.self, forKey: .watchface) {
+            self.watchface = watchface
+        }
+        if let datafield = try? container.decode(GarminDatafield.self, forKey: .datafield) {
+            self.datafield = datafield
+        }
+        if let primaryAttributeChoice = try? container
+            .decode(GarminPrimaryAttributeChoice.self, forKey: .primaryAttributeChoice)
+        {
+            self.primaryAttributeChoice = primaryAttributeChoice
+        }
+        if let secondaryAttributeChoice = try? container.decode(
+            GarminSecondaryAttributeChoice.self,
+            forKey: .secondaryAttributeChoice
+        ) {
+            self.secondaryAttributeChoice = secondaryAttributeChoice
+        }
+        if let isWatchfaceDataEnabled = try? container.decode(Bool.self, forKey: .isWatchfaceDataEnabled) {
+            self.isWatchfaceDataEnabled = isWatchfaceDataEnabled
+        }
+        if let isCommandControlEnabled = try? container.decode(Bool.self, forKey: .isCommandControlEnabled) {
+            self.isCommandControlEnabled = isCommandControlEnabled
+        }
+        if let isBolusCommandEnabled = try? container.decode(Bool.self, forKey: .isBolusCommandEnabled) {
+            self.isBolusCommandEnabled = isBolusCommandEnabled
+        }
+    }
 }

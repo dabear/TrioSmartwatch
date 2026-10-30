@@ -11,6 +11,9 @@ protocol CarbsObserver {
 protocol CarbsStorage {
     var updatePublisher: AnyPublisher<Void, Never> { get }
     func storeCarbs(_ carbs: [CarbsEntry], areFetchedFromRemote: Bool) async throws
+    /// Stores one local carb row without fat/protein equivalents and, unlike `storeCarbs`, throws when
+    /// the save fails. `authorize` runs inside the transaction; whatever it throws leaves nothing written.
+    func storeVerifiedCarbs(_ entry: CarbsEntry, authorize: @escaping () throws -> Void) async throws
     /// Builds a single, real, locally-entered carb entry ready to pass to `storeCarbs`.
     func makeCarbEntry(carbs: Decimal, date: Date) -> CarbsEntry
     /// Swaps a stored meal in one Core Data transaction.
@@ -286,6 +289,24 @@ final class BaseCarbsStorage: CarbsStorage, Injectable {
 
             if carbEquivalentCount > 0 {
                 await saveFPUToCoreDataAsBatchInsert(entries: futureCarbEquivalents, areFetchedFromRemote: areFetchedFromRemote)
+            }
+        }
+    }
+
+    func storeVerifiedCarbs(_ entry: CarbsEntry, authorize: @escaping () throws -> Void) async throws {
+        let context = makeContext()
+        context.name = "storeVerifiedCarbs"
+        try await context.perform {
+            try authorize()
+            self.insertCarbEntry(entry, into: context, areFetchedFromRemote: false)
+
+            guard context.hasChanges else { return }
+            do {
+                try context.save()
+            } catch {
+                // an injected long-lived context would otherwise save the failed row later
+                context.rollback()
+                throw error
             }
         }
     }

@@ -1089,180 +1089,100 @@
         }
       }
     },
-    "%lld of %lld characters" : {
-
+    "A bolus was given in the last 6 minutes." : {
+      "comment" : "Watch command ack"
     },
-    "Add Screenshots" : {
-
+    "Allow Bolus Commands" : {},
+    "Allow the Garmin app to deliver insulin. Requires watch commands to be enabled." : {},
+    "Allow the Garmin app to log carbs and start or stop overrides and temp targets." : {},
+    "%lld of %lld characters" : {},
+    "Add Screenshots" : {},
+    "Also Sent" : {},
+    "Ask on Discord" : {},
+    "Ask on Facebook" : {},
+    "Bolus exceeds max bolus." : {
+      "comment" : "Watch command ack"
     },
-    "Also Sent" : {
-
+    "Bolus failed. Check pump history before repeating." : {
+      "comment" : "Watch command ack"
     },
-    "Ask on Discord" : {
-
+    "Bolus from watch is disabled." : {
+      "comment" : "Watch command ack"
     },
-    "Ask on Facebook" : {
-
+    "Bolus started." : {
+      "comment" : "Watch command ack"
     },
-    "Attach My Logs" : {
-
+    "Bolus would exceed max IOB." : {
+      "comment" : "Watch command ack"
     },
-    "Build" : {
-
+    "Carbs exceed the maximum allowed." : {
+      "comment" : "Watch command ack"
     },
-    "Change Screenshots" : {
-
+    "Carbs logged and bolus started." : {
+      "comment" : "Watch command ack"
     },
-    "Contact" : {
-
+    "Carbs logged." : {
+      "comment" : "Watch command ack"
     },
-    "Copy ID" : {
-
+    "Carbs logged. Bolus failed, check pump history before repeating." : {
+      "comment" : "Watch command ack"
     },
-    "Couldn't Delete Report" : {
-
+    "Carbs logged. No bolus was delivered." : {
+      "comment" : "Watch command ack"
     },
-    "Couldn't Send Report" : {
-
-    },
-    "Delete Report" : {
-
-    },
-    "Delete Report?" : {
-
-    },
-    "Deleting" : {
-
-    },
-    "Deleting a report removes it and its files from the Trio team's server." : {
-
-    },
-    "Describe what happened and what you expected" : {
-
-    },
-    "Discord Name" : {
-
-    },
-    "Email" : {
-
-    },
-    "Fill in any of these so the team can follow up with you." : {
-
-    },
-    "Get help from other Trio users." : {
-
-    },
-    "GitHub Username" : {
-
-    },
-    "Includes glucose, insulin, carbs and your settings. Passwords and serial numbers are removed." : {
-
-    },
-    "iOS Version" : {
-
-    },
-    "iPhone Model" : {
-
-    },
-    "One of the screenshots couldn't be read. Try choosing it again or leave it out." : {
-
-    },
-    "Open a GitHub Issue" : {
-
-    },
-    "Private. Describe the problem, add screenshots and your logs. Only the Trio team can see it." : {
-
-    },
-    "Public. Only for bugs you can describe without personal or health data." : {
-
-    },
-    "Report %@ and its files will be deleted from the Trio team's server." : {
-
-    },
-    "Report a Problem" : {
-
-    },
-    "Report Actions" : {
-
-    },
-    "Report Sent" : {
-
-    },
-    "Reports go only to the Trio team and are deleted after 90 days. You can delete a report yourself at any time." : {
-
-    },
-    "Save the file or send it to someone helping you on Discord or Facebook. Contains glucose, insulin and carbs; passwords and serial numbers are removed." : {
-
-    },
-    "Screenshot %lld" : {
-
-    },
-    "Screenshots" : {
-
-    },
-    "Send to the Trio Team" : {
-
-    },
-    "Sending" : {
-
-    },
-    "Some files didn't reach the Trio team's server. Please try again." : {
-
-    },
-    "Sending Report" : {
-
-    },
-    "Sent Reports" : {
-
-    },
-    "Stay Anonymous" : {
-
-    },
-    "Submit" : {
-
-    },
-    "Thank you. Your report ID is %@. Mention it if you ask about this on Discord or Facebook." : {
-
-    },
-    "The report is too large. Try fewer or smaller screenshots." : {
-
-    },
-    "The report won't include your name or contact details." : {
-
-    },
-    "The Trio team's server couldn't take the report right now (error %lld)." : {
-
-    },
-    "The Trio team's server sent an answer the app doesn't understand." : {
-
-    },
-    "This build of Trio can't send reports. Please share your logs on Discord or Facebook instead." : {
-
-    },
-    "Title (optional)" : {
-
-    },
-    "Trio couldn't confirm with Apple that this copy of the app is genuine. Please try again later." : {
-
-    },
-    "Try Again" : {
-
-    },
-    "Up to %lld screenshots or photos." : {
-
-    },
-    "You've sent several reports today. Please try again tomorrow." : {
-
-    },
-    "Your Logs" : {
-
-    },
-    "Your logs are too large to send. Turn off Attach My Logs and share them on Discord or Facebook instead." : {
-
-    },
-    "Your logs couldn't be prepared. Try again, or turn off Attach My Logs." : {
-
-    },
+    "Attach My Logs" : {},
+    "Build" : {},
+    "Change Screenshots" : {},
+    "Contact" : {},
+    "Copy ID" : {},
+    "Couldn't Delete Report" : {},
+    "Couldn't Send Report" : {},
+    "Delete Report" : {},
+    "Delete Report?" : {},
+    "Deleting" : {},
+    "Deleting a report removes it and its files from the Trio team's server." : {},
+    "Describe what happened and what you expected" : {},
+    "Discord Name" : {},
+    "Email" : {},
+    "Fill in any of these so the team can follow up with you." : {},
+    "Get help from other Trio users." : {},
+    "GitHub Username" : {},
+    "Includes glucose, insulin, carbs and your settings. Passwords and serial numbers are removed." : {},
+    "iOS Version" : {},
+    "iPhone Model" : {},
+    "One of the screenshots couldn't be read. Try choosing it again or leave it out." : {},
+    "Open a GitHub Issue" : {},
+    "Private. Describe the problem, add screenshots and your logs. Only the Trio team can see it." : {},
+    "Public. Only for bugs you can describe without personal or health data." : {},
+    "Report %@ and its files will be deleted from the Trio team's server." : {},
+    "Report a Problem" : {},
+    "Report Actions" : {},
+    "Report Sent" : {},
+    "Reports go only to the Trio team and are deleted after 90 days. You can delete a report yourself at any time." : {},
+    "Save the file or send it to someone helping you on Discord or Facebook. Contains glucose, insulin and carbs; passwords and serial numbers are removed." : {},
+    "Screenshot %lld" : {},
+    "Screenshots" : {},
+    "Send to the Trio Team" : {},
+    "Sending" : {},
+    "Some files didn't reach the Trio team's server. Please try again." : {},
+    "Sending Report" : {},
+    "Sent Reports" : {},
+    "Stay Anonymous" : {},
+    "Submit" : {},
+    "Thank you. Your report ID is %@. Mention it if you ask about this on Discord or Facebook." : {},
+    "The report is too large. Try fewer or smaller screenshots." : {},
+    "The report won't include your name or contact details." : {},
+    "The Trio team's server couldn't take the report right now (error %lld)." : {},
+    "The Trio team's server sent an answer the app doesn't understand." : {},
+    "This build of Trio can't send reports. Please share your logs on Discord or Facebook instead." : {},
+    "Title (optional)" : {},
+    "Trio couldn't confirm with Apple that this copy of the app is genuine. Please try again later." : {},
+    "Try Again" : {},
+    "Up to %lld screenshots or photos." : {},
+    "You've sent several reports today. Please try again tomorrow." : {},
+    "Your Logs" : {},
+    "Your logs are too large to send. Turn off Attach My Logs and share them on Discord or Facebook instead." : {},
+    "Your logs couldn't be prepared. Try again, or turn off Attach My Logs." : {},
     "Choose the preferred lower threshold for Time in Range statistics." : {
       "comment" : "Short description of the lower range threshold setting.",
       "localizations" : {
@@ -1285,6 +1205,34 @@
         }
       }
     },
+    "Command expired. Please try again." : {
+      "comment" : "Watch command ack"
+    },
+    "Commands" : {},
+    "Commands are only accepted from the Garmin apps selected above, must reach the phone within 2 minutes of being confirmed on the watch, and carbs are limited by your Max Carbs setting." : {},
+    "Could not log carbs." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not log carbs. No bolus was delivered." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not start override." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not start temp target." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not stop override." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not stop temp target." : {
+      "comment" : "Watch command ack"
+    },
+    "Could not verify bolus safety." : {
+      "comment" : "Watch command ack"
+    },
+    "Enable Watch Commands" : {},
+    "Every bolus is checked against your Max Bolus and Max IOB. A watch bolus is refused for 6 minutes after the previous watch bolus, and any watch bolus is refused if the boluses of the last 6 minutes (SMBs included) add up to 20% or more of it. These checks cannot tell who pressed the button on the watch: anyone with access to your watch can deliver insulin up to those limits." : {},
     "Extended (%@)" : {
       "comment" : "Extended lower threshold for TIR and TITR statistics; placeholder includes glucose value and units.",
       "localizations" : {
@@ -1317,6 +1265,45 @@
           }
         }
       }
+    },
+    "Invalid bolus amount." : {
+      "comment" : "Watch command ack"
+    },
+    "Invalid carbs amount." : {
+      "comment" : "Watch command ack"
+    },
+    "Invalid command." : {
+      "comment" : "Watch command ack"
+    },
+    "IOB unavailable. Bolus not delivered." : {
+      "comment" : "Watch command ack"
+    },
+    "Lets a supported Garmin app log carbs and start or stop override and temp target presets. Status and the preset list stay available with this switch off." : {},
+    "Lets the Garmin app deliver a bolus, alone or together with carbs, without any confirmation on this phone." : {},
+    "Only enable this if you keep your watch locked and under your control." : {},
+    "Override preset not found." : {
+      "comment" : "Watch command ack"
+    },
+    "Override started." : {
+      "comment" : "Watch command ack"
+    },
+    "Override stopped." : {
+      "comment" : "Watch command ack"
+    },
+    "Request ID was already used." : {
+      "comment" : "Watch command ack"
+    },
+    "Request is already in progress." : {
+      "comment" : "Watch command ack"
+    },
+    "Temp target preset not found." : {
+      "comment" : "Watch command ack"
+    },
+    "Temp target started." : {
+      "comment" : "Watch command ack"
+    },
+    "Temp target stopped." : {
+      "comment" : "Watch command ack"
     },
     "TIR Lower Threshold" : {
       "comment" : "Setting for the lower glucose boundary shared by TIR and TITR statistics.",
@@ -1384,6 +1371,9 @@
         }
       }
     },
+    "Too many requests in progress. Please try again." : {
+      "comment" : "Watch command ack"
+    },
     "Uses the established lower threshold of %@." : {
       "comment" : "Standard lower range threshold description; placeholder includes glucose value and units.",
       "localizations" : {
@@ -1405,6 +1395,12 @@
           }
         }
       }
+    },
+    "Watch command settings changed." : {
+      "comment" : "Watch command ack"
+    },
+    "Watch commands are disabled." : {
+      "comment" : "Watch command ack"
     },
     " " : {
       "localizations" : {
@@ -37728,9 +37724,7 @@
         }
       }
     },
-    "Adds this widget to the layout" : {
-
-    },
+    "Adds this widget to the layout" : {},
     "Adds Transmitter Battery" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -42373,9 +42367,7 @@
         }
       }
     },
-    "All Logs" : {
-
-    },
+    "All Logs" : {},
     "All Past Days of Data " : {
       "comment" : "Duration displayed in statPanel",
       "extractionState" : "manual",
@@ -45939,9 +45931,7 @@
         }
       }
     },
-    "Already in the layout" : {
-
-    },
+    "Already in the layout" : {},
     "Already set for Day & Night. Change the alarm time window to add a second alarm for the same type." : {
       "localizations" : {
         "bg" : {
@@ -57119,9 +57109,7 @@
         }
       }
     },
-    "Available Widgets" : {
-
-    },
+    "Available Widgets" : {},
     "Average" : {
       "comment" : "Average BG =",
       "localizations" : {
@@ -76653,9 +76641,7 @@
         }
       }
     },
-    "CGM Logs" : {
-
-    },
+    "CGM Logs" : {},
     "CGM noise level too high: %lld." : {
       "localizations" : {
         "bg" : {
@@ -78264,9 +78250,7 @@
         }
       }
     },
-    "Changes the size of the current glucose reading and its trend arrow on the Simple Lock Screen widget. The delta and the time of the last reading are not affected." : {
-
-    },
+    "Changes the size of the current glucose reading and its trend arrow on the Simple Lock Screen widget. The delta and the time of the last reading are not affected." : {},
     "Chapter %1$d of %2$d, %3$@" : {
       "comment" : "Accessibility: onboarding progress",
       "localizations" : {
@@ -80488,9 +80472,7 @@
         }
       }
     },
-    "Choose how far back the statistics panel on the home screen looks. The full statistics view opens on the same time span.\n\nToday: from midnight until now.\n\nLast 24 Hours: the past 24 hours.\n\nLast 7 Days: the past 7 days.\n\nLast Month: the past month.\n\nLast 3 Months: the past 3 months.\n\nThe panel's wording follows your choice, for example \"Time in Range last 7 days\"." : {
-
-    },
+    "Choose how far back the statistics panel on the home screen looks. The full statistics view opens on the same time span.\n\nToday: from midnight until now.\n\nLast 24 Hours: the past 24 hours.\n\nLast 7 Days: the past 7 days.\n\nLast Month: the past month.\n\nLast 3 Months: the past 3 months.\n\nThe panel's wording follows your choice, for example \"Time in Range last 7 days\"." : {},
     "Choose if you only want to use a datafield and no supported watchface!" : {
       "localizations" : {
         "bg" : {
@@ -80621,9 +80603,7 @@
         }
       }
     },
-    "Choose the time span the home statistics panel covers." : {
-
-    },
+    "Choose the time span the home statistics panel covers." : {},
     "Choose to display eA1c and GMI in percent or mmol/mol." : {
       "localizations" : {
         "bg" : {
@@ -81539,9 +81519,7 @@
         }
       }
     },
-    "Choose what the statistics panel on the home screen shows by default. Tapping the panel always opens the full statistics view.\n\nTime in Range: your time in range percentage with a glucose distribution bar.\n\nDistribution Bar Only: just the glucose distribution bar, without the percentage.\n\nAverages: your average glucose and GMI (Glucose Management Index).\n\nHide Statistics: shows no data at all, just a \"View Statistics\" shortcut.\n\nThe numbers cover the time span set in Home Statistics Range." : {
-
-    },
+    "Choose what the statistics panel on the home screen shows by default. Tapping the panel always opens the full statistics view.\n\nTime in Range: your time in range percentage with a glucose distribution bar.\n\nDistribution Bar Only: just the glucose distribution bar, without the percentage.\n\nAverages: your average glucose and GMI (Glucose Management Index).\n\nHide Statistics: shows no data at all, just a \"View Statistics\" shortcut.\n\nThe numbers cover the time span set in Home Statistics Range." : {},
     "Choose whether or not to display one or both X- and Y-Axis grid lines." : {
       "localizations" : {
         "bg" : {
@@ -90762,9 +90740,7 @@
         }
       }
     },
-    "Could not prepare logs" : {
-
-    },
+    "Could not prepare logs" : {},
     "Could not save the change." : {
       "comment" : "Adjustment could not be saved",
       "localizations" : {
@@ -91685,9 +91661,7 @@
         }
       }
     },
-    "Creates one file you can send when asking for help." : {
-
-    },
+    "Creates one file you can send when asking for help." : {},
     "Critical" : {
       "comment" : "Name of the critical alarm sound.",
       "localizations" : {
@@ -102614,9 +102588,7 @@
         }
       }
     },
-    "Default: Large" : {
-
-    },
+    "Default: Large" : {},
     "Default: OFF" : {
       "localizations" : {
         "bg" : {
@@ -118196,9 +118168,7 @@
         }
       }
     },
-    "Drag a widget to move it. Drag one up from Available Widgets to add it, or drop it back onto the list to remove it." : {
-
-    },
+    "Drag a widget to move it. Drag one up from Available Widgets to add it, or drop it back onto the list to remove it." : {},
     "Drives the outer-ring + tag on the home screen's glucose bobble." : {
       "localizations" : {
         "bg" : {
@@ -122403,9 +122373,7 @@
         }
       }
     },
-    "Empty widget slot" : {
-
-    },
+    "Empty widget slot" : {},
     "Enable" : {
       "comment" : "Enable FPU",
       "extractionState" : "manual",
@@ -126491,9 +126459,7 @@
         }
       }
     },
-    "Enable uploading of sensor errors and other CGM states to Nightscout as notes." : {
-
-    },
+    "Enable uploading of sensor errors and other CGM states to Nightscout as notes." : {},
     "Enabled" : {
       "comment" : "Title string for BeepPreference.manualCommands",
       "extractionState" : "manual",
@@ -153936,9 +153902,7 @@
         }
       }
     },
-    "Glucose Reading Font" : {
-
-    },
+    "Glucose Reading Font" : {},
     "Glucose Settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -163517,9 +163481,7 @@
         }
       }
     },
-    "How far back?" : {
-
-    },
+    "How far back?" : {},
     "How it Works" : {
       "localizations" : {
         "bg" : {
@@ -177775,9 +177737,7 @@
         }
       }
     },
-    "Its Widget Configuration lets you set the size of the glucose reading." : {
-
-    },
+    "Its Widget Configuration lets you set the size of the glucose reading." : {},
     "Just be aware: if you force quit the app before finishing onboarding, your progress will not be saved." : {
       "localizations" : {
         "bg" : {
@@ -178437,9 +178397,7 @@
     "Last 24 Hours" : {
       "comment" : "Home stats panel range option"
     },
-    "Last 3 Days" : {
-
-    },
+    "Last 3 Days" : {},
     "last 3 months" : {
       "comment" : "Stats banner scope"
     },
@@ -184790,9 +184748,7 @@
         }
       }
     },
-    "Lock Screen widget preview" : {
-
-    },
+    "Lock Screen widget preview" : {},
     "Lock Screen Widget Style" : {
       "localizations" : {
         "bg" : {
@@ -207735,9 +207691,7 @@
         }
       }
     },
-    "More information about Glucose Reading Font" : {
-
-    },
+    "More information about Glucose Reading Font" : {},
     "More options" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -217235,9 +217189,7 @@
         }
       }
     },
-    "Not enough room" : {
-
-    },
+    "Not enough room" : {},
     "not looping" : {
       "comment" : "Accessibility: loop status",
       "localizations" : {
@@ -220635,9 +220587,7 @@
         }
       }
     },
-    "Notes carry the state name the CGM itself uses, such as sensorFailed or warmup. Each state is noted once, and a state that returns after usable readings resume is noted again." : {
-
-    },
+    "Notes carry the state name the CGM itself uses, such as sensorFailed or warmup. Each state is noted once, and a state that returns after usable readings resume is noted again." : {},
     "Nothing is currently running." : {
       "comment" : "No active adjustment to cancel",
       "localizations" : {
@@ -239403,9 +239353,7 @@
         }
       }
     },
-    "Preview" : {
-
-    },
+    "Preview" : {},
     "Preview Contact Image" : {
       "localizations" : {
         "bg" : {
@@ -243886,9 +243834,7 @@
         }
       }
     },
-    "Pump Logs" : {
-
-    },
+    "Pump Logs" : {},
     "Pump Model" : {
       "localizations" : {
         "bg" : {
@@ -251747,9 +251693,7 @@
         }
       }
     },
-    "Remove %@" : {
-
-    },
+    "Remove %@" : {},
     "Remove All" : {
       "localizations" : {
         "bg" : {
@@ -252925,9 +252869,7 @@
         }
       }
     },
-    "Requires Allow Uploading to Nightscout. Supported for Dexcom G6 and G7." : {
-
-    },
+    "Requires Allow Uploading to Nightscout. Supported for Dexcom G6 and G7." : {},
     "Reserved" : {
       "comment" : "Live Activity widget icon label for the slot taken by a double-width item"
     },
@@ -266974,9 +266916,7 @@
         }
       }
     },
-    "Set the size of the glucose reading." : {
-
-    },
+    "Set the size of the glucose reading." : {},
     "Set the value enableSMB_high_bg will compare against to enable SMB. If BG > than this value, SMBs should enable." : {
       "comment" : "... When Blood Glucose Is Over (mg/dl):",
       "extractionState" : "manual",
@@ -268437,9 +268377,7 @@
         }
       }
     },
-    "Share CGM Logs" : {
-
-    },
+    "Share CGM Logs" : {},
     "Share logs" : {
       "comment" : "2 log files to share",
       "extractionState" : "manual",
@@ -268838,12 +268776,8 @@
         }
       }
     },
-    "Share Pump Logs" : {
-
-    },
-    "Share Trio Logs" : {
-
-    },
+    "Share Pump Logs" : {},
+    "Share Trio Logs" : {},
     "Shared Secret" : {
       "localizations" : {
         "bg" : {
@@ -273293,9 +273227,7 @@
       "comment" : "Name of a sound file in the catalog.",
       "isCommentAutoGenerated" : true
     },
-    "Sizes follow your iPhone's text size setting, so the reading keeps scaling if you change the text size in iOS Settings." : {
-
-    },
+    "Sizes follow your iPhone's text size setting, so the reading keeps scaling if you change the text size in iOS Settings." : {},
     "Skip Bolus screen after carbs" : {
       "comment" : "Do you want to show bolus screen after added carbs?",
       "extractionState" : "manual",
@@ -282650,9 +282582,7 @@
         }
       }
     },
-    "Home Statistics Range" : {
-
-    },
+    "Home Statistics Range" : {},
     "Stay in open loop (no automated dosing) for a bit to help Trio catch up to keep you safe" : {
       "localizations" : {
         "bg" : {
@@ -322951,9 +322881,7 @@
         }
       }
     },
-    "Trio may lower or stop your basal insulin when it forecasts you are heading low. It will never give extra insulin to bring a high down.\nTrio does not wait for one set glucose number. It watches your forecast and lowers basal early. While this mode is on, Trio acts as if your Max IOB is 0. Your saved setting does not change.\nIf IOB is negative from LGS lowering your basal, it may give additional insulin until IOB reaches 0." : {
-
-    },
+    "Trio may lower or stop your basal insulin when it forecasts you are heading low. It will never give extra insulin to bring a high down.\nTrio does not wait for one set glucose number. It watches your forecast and lowers basal early. While this mode is on, Trio acts as if your Max IOB is 0. Your saved setting does not change.\nIf IOB is negative from LGS lowering your basal, it may give additional insulin until IOB reaches 0." : {},
     "Trio may only lower basal insulin. It will not correct highs." : {
       "localizations" : {
         "bg" : {
@@ -332660,9 +332588,7 @@
         }
       }
     },
-    "Upload CGM Sensor States" : {
-
-    },
+    "Upload CGM Sensor States" : {},
     "Upload Glucose" : {
       "localizations" : {
         "bg" : {
@@ -345424,12 +345350,8 @@
         }
       }
     },
-    "When your CGM reports a state where it cannot give a usable reading, such as a sensor error or warmup, Trio uploads that state to Nightscout as a note." : {
-
-    },
-    "When your CGM reports a state where it cannot give a usable reading, such as a sensor error or warmup, Trio uploads that state to Nightscout as a note. Supported for Dexcom G6 and G7." : {
-
-    },
+    "When your CGM reports a state where it cannot give a usable reading, such as a sensor error or warmup, Trio uploads that state to Nightscout as a note." : {},
+    "When your CGM reports a state where it cannot give a usable reading, such as a sensor error or warmup, Trio uploads that state to Nightscout as a note. Supported for Dexcom G6 and G7." : {},
     "which is below your Threshold (" : {
       "comment" : "Bolus pop-up / Alert string. Make translations concise!",
       "extractionState" : "manual",
@@ -350548,9 +350470,7 @@
         }
       }
     },
-    "Your Nightscout address, passwords and device serial numbers are removed." : {
-
-    },
+    "Your Nightscout address, passwords and device serial numbers are removed." : {},
     "Your phone or app is not enabled for NFC communications, which is needed to pair to libre2 sensors" : {
       "extractionState" : "manual",
       "localizations" : {

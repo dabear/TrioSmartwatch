@@ -20,8 +20,14 @@ protocol PreferencesObserver {
 final class BaseSettingsManager: SettingsManager, Injectable {
     @Injected() var broadcaster: Broadcaster!
     @Injected() var storage: FileStorage!
+    @Injected() private var watchCommandAuthorization: WatchCommandAuthorization!
 
     @SyncAccess var settings: TrioSettings {
+        // on the writing queue: the async observer notification only carries the latest value and
+        // cannot tell that a command switch went off and back on in between
+        willSet {
+            watchCommandAuthorization.settingsWillChange(from: settings, to: newValue)
+        }
         didSet {
             if oldValue != settings {
                 saveSettings()
