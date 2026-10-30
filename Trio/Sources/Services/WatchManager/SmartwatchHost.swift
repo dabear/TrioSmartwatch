@@ -76,8 +76,6 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @MainActor private var updateGeneration = 0
     /// Hands out the bolus context and tracks the watch bolus being delivered.
     @MainActor private var bolusContextIssuer = SmartwatchBolusContextIssuer()
-    /// How fresh every remote action from the watch must be.
-    private let requestWindow = SmartwatchRequestWindow.standard
     /// Carb entries from the watch that the latest determination may not count yet.
     @MainActor private var watchCarbEntries: [WatchCarbEntry] = []
 
@@ -203,6 +201,15 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
             .store(in: &subscriptions)
 
+        // The toggles write UserDefaults directly; resend only when the permitted set changes.
+        Foundation.NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .map { _ in UserDefaults.standard.permittedSmartwatchActions(within: UserDefaults.smartwatchRemoteActions) }
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
+            .store(in: &subscriptions)
+
         for entity in ["OverrideStored", "TempTargetStored"] {
             CoreDataStack.shared.entityChangePublisher
                 .receive(on: coreDataQueue)
@@ -266,6 +273,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         if capabilities.contains(.remoteTempTarget) {
             snapshot.tempTargetPresets = try await tempTargetPresets()
         }
+        addRemoteActionInfo(to: &snapshot, capabilities: capabilities)
         guard capabilities.contains(.loopStatus) || capabilities.contains(.therapy) || capabilities.contains(.remoteBolus)
         else { return snapshot }
 
@@ -300,6 +308,22 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             )
         }
         return snapshot
+    }
+
+    /// What every snapshot carries for the remote actions: the user's permissions
+    /// and the limits a watch shows before it has a bolus context.
+    @MainActor private func addRemoteActionInfo(
+        to snapshot: inout SmartwatchStatusSnapshot,
+        capabilities: SmartwatchCapabilities
+    ) {
+        snapshot.permittedActions = UserDefaults.standard.permittedSmartwatchActions(within: capabilities)
+        if capabilities.contains(.remoteCarbs) {
+            snapshot.maximumCarbEntry = Double(truncating: settingsManager.settings.maxCarbs as NSNumber)
+        }
+        if capabilities.contains(.remoteBolus) {
+            snapshot.bolusIncrement = SmartwatchStatusSnapshot
+                .bolusIncrement(of: deviceDataManager.pumpManager?.supportedBolusVolumes ?? [])
+        }
     }
 
     private func fetchReadings(since start: Date) async throws -> [SmartwatchGlucoseReading] {
@@ -377,7 +401,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         let pumpManager = deviceDataManager.pumpManager
         let latestGlucoseDate = try? await fetchReadings(since: Date().addingTimeInterval(-60 * 60)).last?.date
         let policy = SmartwatchBolusPolicy(
-            limits: .init(requestWindow: requestWindow),
+            limits: manager.remoteActionLimits.bolusPolicyLimits,
             isAllowed: refusal == nil,
             currentContext: bolusContextIssuer.current,
             latestGlucoseDate: latestGlucoseDate,
@@ -421,6 +445,16 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             throw SmartwatchBolusError.refusedByHost(String(describing: error))
         }
 
+        // Checked again after the awaits above, right before the pump call, so a
+        // permission turned off meanwhile stops the bolus.
+        if let refusal = self.refusal(
+            for: manager,
+            capability: .remoteBolus,
+            isAllowed: UserDefaults.standard.allowSmartwatchBolus
+        ) {
+            log(manager, .error, "Bolus request rejected just before delivery: notAllowed (\(refusal))")
+            throw SmartwatchBolusError.notAllowed
+        }
         log(manager, .delegate, String(format: "Delivering watch bolus of %.3f U", units))
 
         // enactBolus answers through its callback before it returns.
@@ -651,7 +685,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             log(manager, .error, "Mute request rejected: notAllowed (\(refusal))")
             throw SmartwatchAlertMuteError.notAllowed
         }
-        guard requestWindow.contains(request.requestedAt, now: Date()) else {
+        guard manager.remoteActionLimits.requestWindow.contains(request.requestedAt, now: Date()) else {
             log(
                 manager,
                 .error,
@@ -692,7 +726,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         let outcome: (Result<Double, SmartwatchCarbEntryError>, Date?) = await MainActor.run {
             let previous = UserDefaults.standard.lastSmartwatchCarbEntry
             let policy = SmartwatchCarbEntryPolicy(
-                limits: .init(requestWindow: self.requestWindow),
+                limits: manager.remoteActionLimits.carbEntryPolicyLimits,
                 isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous
             )
             let result = policy.evaluate(request, now: Date())
@@ -706,11 +740,23 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             log(manager, .error, "Carb entry request rejected: \(error)\(refusal.map { " (\($0))" } ?? "")")
             throw error
         }
-        let entryDate = Date()
+        // Checked again after the hop above, right before storing.
+        if let refusal = self.refusal(
+            for: manager,
+            capability: .remoteCarbs,
+            isAllowed: UserDefaults.standard.allowSmartwatchCarbs
+        ) {
+            await MainActor.run { UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry }
+            log(manager, .error, "Carb entry request rejected just before storing: notAllowed (\(refusal))")
+            throw SmartwatchCarbEntryError.notAllowed
+        }
         do {
-            let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: entryDate)
+            // Dated when the user confirmed it on the watch.
+            let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: request.requestedAt)
             try await carbsStorage.storeCarbs([entry], areFetchedFromRemote: false)
-            await MainActor.run { self.watchCarbEntries.append(WatchCarbEntry(date: entryDate, grams: grams)) }
+            // Counted from when it was stored: a determination from before then can't include it.
+            let storedAt = Date()
+            await MainActor.run { self.watchCarbEntries.append(WatchCarbEntry(date: storedAt, grams: grams)) }
         } catch {
             await MainActor.run {
                 UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry
@@ -785,7 +831,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             throw SmartwatchPresetError.notAllowed
         }
         let age = Date().timeIntervalSince(requestedAt)
-        guard requestWindow.contains(requestedAt, now: Date()) else {
+        guard manager.remoteActionLimits.requestWindow.contains(requestedAt, now: Date()) else {
             log(manager, .error, String(format: "%@ request rejected: expiredRequest (confirmed %.0f s ago)", kind, age))
             throw SmartwatchPresetError.expiredRequest
         }
@@ -798,6 +844,9 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
                 _ = try await cancel()
                 log(manager, .delegateResponse, "\(kind) ended from the watch")
             }
+        } catch AdjustmentError.nothingActive {
+            // Nothing to end is what the user asked for.
+            log(manager, .delegateResponse, "\(kind) end requested from the watch: nothing was running")
         } catch AdjustmentError.presetNotFound {
             log(manager, .error, "\(kind) request rejected: unknownPreset")
             throw SmartwatchPresetError.unknownPreset
@@ -849,6 +898,23 @@ extension UserDefaults {
 
     /// Turns the permissions off, so a new watch plugin never inherits what the
     /// user granted another one.
+    /// Every remote action a Watch permission toggle covers.
+    static let smartwatchRemoteActions: SmartwatchCapabilities = [
+        .remoteBolus, .remoteCarbs, .remoteMute, .remoteOverride, .remoteTempTarget
+    ]
+
+    /// The remote actions among `capabilities` whose toggle is on, for the
+    /// snapshot's `permittedActions`.
+    func permittedSmartwatchActions(within capabilities: SmartwatchCapabilities) -> SmartwatchCapabilities {
+        var permitted: SmartwatchCapabilities = []
+        if allowSmartwatchBolus { permitted.insert(.remoteBolus) }
+        if allowSmartwatchCarbs { permitted.insert(.remoteCarbs) }
+        if allowSmartwatchMute { permitted.insert(.remoteMute) }
+        if allowSmartwatchOverrides { permitted.insert(.remoteOverride) }
+        if allowSmartwatchTempTargets { permitted.insert(.remoteTempTarget) }
+        return permitted.intersection(capabilities)
+    }
+
     func resetSmartwatchPermissions() {
         set(false, forKey: Self.allowSmartwatchOverridesKey)
         set(false, forKey: Self.allowSmartwatchTempTargetsKey)
