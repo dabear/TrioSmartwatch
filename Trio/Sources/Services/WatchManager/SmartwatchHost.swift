@@ -63,6 +63,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @Injected() private var tempTargetStorage: TempTargetsStorage!
     @Injected() private var carbsStorage: CarbsStorage!
     @Injected() private var bolusCalculationManager: BolusCalculationManager!
+    @Injected() private var bolusSafetyValidator: BolusSafetyValidator!
 
     @PersistedProperty(key: "SmartwatchManagerState") private var rawSmartwatchManager: [String: Any]?
 
@@ -380,8 +381,27 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
             units = allowed
         }
 
+        // Spent before the checks below, so a resend that arrives while they run
+        // gets inProgress instead of passing the policy again.
         bolusContextIssuer.beginDelivery(of: request)
         defer { bolusContextIssuer.endDelivery() }
+
+        // Trio's own checks for any bolus from outside the bolus screen (remote
+        // commands, Shortcuts): max bolus, max IOB, and no recent bolus of 20 % or
+        // more within 6 minutes. The default window covers the whole time since the
+        // user confirmed, which is at most 30 seconds.
+        do {
+            if case let .rejected(reason) = try await bolusSafetyValidator.validate(bolusAmount: Decimal(units)) {
+                log(manager, .error, "Bolus request rejected by Trio's bolus safety checks: \(reason)")
+                throw SmartwatchBolusError.refusedByHost(String(describing: reason))
+            }
+        } catch let error as SmartwatchBolusError {
+            throw error
+        } catch {
+            log(manager, .error, "Bolus request rejected: Trio's bolus safety checks failed (\(error))")
+            throw SmartwatchBolusError.refusedByHost(String(describing: error))
+        }
+
         log(manager, .delegate, String(format: "Delivering watch bolus of %.3f U", units))
 
         // enactBolus answers through its callback before it returns.
