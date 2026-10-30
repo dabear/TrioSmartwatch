@@ -75,6 +75,8 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @MainActor private var updateGeneration = 0
     /// Hands out the bolus context and tracks the watch bolus being delivered.
     @MainActor private var bolusContextIssuer = SmartwatchBolusContextIssuer()
+    /// How fresh every remote action from the watch must be.
+    private let requestWindow = SmartwatchRequestWindow.standard
 
     private(set) var smartwatchManager: SmartwatchManagerUI? {
         didSet {
@@ -362,6 +364,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         let refusal = refusal(for: manager, capability: .remoteBolus, isAllowed: UserDefaults.standard.allowSmartwatchBolus)
         let pumpManager = deviceDataManager.pumpManager
         let policy = SmartwatchBolusPolicy(
+            limits: .init(requestWindow: requestWindow),
             isAllowed: refusal == nil,
             currentContext: bolusContextIssuer.current,
             recentDeliveries: UserDefaults.standard.smartwatchBolusDeliveries,
@@ -594,7 +597,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             log(manager, .error, "Mute request rejected: notAllowed (\(refusal))")
             throw SmartwatchAlertMuteError.notAllowed
         }
-        guard SmartwatchBolusPolicy.Limits.standard.isFresh(request.requestedAt, now: Date()) else {
+        guard requestWindow.contains(request.requestedAt, now: Date()) else {
             log(
                 manager,
                 .error,
@@ -634,7 +637,9 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         // that arrives meanwhile is rate limited instead of added twice.
         let outcome: (Result<Double, SmartwatchCarbEntryError>, Date?) = await MainActor.run {
             let previous = UserDefaults.standard.lastSmartwatchCarbEntry
-            let policy = SmartwatchCarbEntryPolicy(isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous)
+            let policy = SmartwatchCarbEntryPolicy(
+                limits: .init(requestWindow: self.requestWindow),
+                isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous)
             let result = policy.evaluate(request, now: Date())
             if case .success = result {
                 UserDefaults.standard.lastSmartwatchCarbEntry = Date()
@@ -723,7 +728,7 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             throw SmartwatchPresetError.notAllowed
         }
         let age = Date().timeIntervalSince(requestedAt)
-        guard SmartwatchBolusPolicy.Limits.standard.isFresh(requestedAt, now: Date()) else {
+        guard requestWindow.contains(requestedAt, now: Date()) else {
             log(manager, .error, String(format: "%@ request rejected: expiredRequest (confirmed %.0f s ago)", kind, age))
             throw SmartwatchPresetError.expiredRequest
         }
