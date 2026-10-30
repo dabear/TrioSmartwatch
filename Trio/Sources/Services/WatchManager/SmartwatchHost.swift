@@ -639,7 +639,8 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             let previous = UserDefaults.standard.lastSmartwatchCarbEntry
             let policy = SmartwatchCarbEntryPolicy(
                 limits: .init(requestWindow: self.requestWindow),
-                isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous)
+                isAllowed: refusal == nil, maximumGrams: maxCarbs, lastEntry: previous
+            )
             let result = policy.evaluate(request, now: Date())
             if case .success = result {
                 UserDefaults.standard.lastSmartwatchCarbEntry = Date()
