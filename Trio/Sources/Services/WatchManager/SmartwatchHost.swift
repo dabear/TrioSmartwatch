@@ -375,17 +375,25 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         }
         let refusal = refusal(for: manager, capability: .remoteBolus, isAllowed: UserDefaults.standard.allowSmartwatchBolus)
         let pumpManager = deviceDataManager.pumpManager
+        let latestGlucoseDate = try? await fetchReadings(since: Date().addingTimeInterval(-60 * 60)).last?.date
         let policy = SmartwatchBolusPolicy(
             limits: .init(requestWindow: requestWindow),
             isAllowed: refusal == nil,
             currentContext: bolusContextIssuer.current,
+            latestGlucoseDate: latestGlucoseDate,
             recentDeliveries: UserDefaults.standard.smartwatchBolusDeliveries,
             roundToSupportedVolume: { pumpManager?.roundToSupportedBolusVolume(units: $0) ?? $0 }
         )
         let units: Double
         switch policy.evaluate(request, now: Date()) {
         case let .failure(error):
-            let reason = error == .notAllowed ? " (\(refusal ?? ""))" : ""
+            let reason = switch error {
+            case .notAllowed: " (\(refusal ?? ""))"
+            case .noRecentGlucose: latestGlucoseDate.map {
+                    String(format: " (newest glucose %.0f min ago)", Date().timeIntervalSince($0) / 60)
+                } ?? " (no glucose in the last hour)"
+            default: ""
+            }
             log(manager, .error, "Bolus request rejected: \(error)\(reason)")
             throw error
         case let .success(allowed):
