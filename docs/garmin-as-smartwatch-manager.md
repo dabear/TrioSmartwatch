@@ -2,6 +2,21 @@
 
 **Draft for review.** Experimental branch `experimental/garmin-on-smartwatch-manager`. This note looks at what it takes to make Trio's `GarminManager` a `SmartwatchManager` plugin, with `SmartwatchHost` as its delegate, instead of a separate service. The branch is `smartwatch-manager` with the Garmin command series merged in: PR #1680 and its follow-ups, `mountrcg/feat/garmin-command-owner-after-pr1-4`. It builds. Nothing here has run on a Garmin.
 
+## Status of the experimental branch (2026-10-30)
+
+**Partly working. Builds; not tested on a Garmin; some of the Garmin series' tests still fail.**
+
+- Done: Garmin is a SmartwatchManager plugin (`GarminSmartwatchManager`) in SmartwatchHost's watch slot, with Garmin's own limits (2 min / 60 s window, any amount up to max bolus, no context token, 6 min between watch boluses; Trio's max bolus, max IOB, recent-bolus check and the 15 min glucose rule still apply). The Connect IQ manager gets Trio's state only from the plugin's snapshots and runs commands only through the plugin's delegate, keeping its request-ID cache, command-owner app and acks. The host stores watch carbs with `storeVerifiedCarbs`.
+- Tests (last full run, 144 tests in 11 suites): passing are the new plugin suite (limits, commands, resends, meals, presets, watch state from the snapshot), the host, the router, the request cache, the pipeline, the processor, carb persistence and settings migration. Failing: 20 issues in the Garmin command, delivery and revocation integration suites:
+  - command-app notice counts (`ownerMode`) and "unregistered device" tests: the notice code is unchanged from the series; whether these failed on the series alone is not yet verified;
+  - command-switch refresh and preset-push tests: the series' settings observer was restored after that run, not yet re-tested.
+- Left:
+  1. Verify the notice failures against the series on its own; fix or report them.
+  2. Re-run the integration suites with the restored settings observer.
+  3. Decide whether to delete the series' Trio-side processor (`BaseWatchCommandProcessor`, `WatchCommandActions`, the insulin lane), which the app no longer uses; its tests still run against it.
+  4. Hide Garmin's own command switches in its settings, now that the host's Allow switches decide; move Garmin's devices and app choices into the plugin's `rawState`; route the device-selection URL through the host.
+  5. Test on a Garmin.
+
 ## What already fits
 
 - **Data:**

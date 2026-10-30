@@ -69,7 +69,8 @@ import Testing
         let resolver = TrioApp().resolver
         let first = resolver.resolve(WatchCommandProcessor.self)
         let second = resolver.resolve(WatchCommandProcessor.self)
-        #expect(first is BaseWatchCommandProcessor)
+        // Garmin runs through its SmartwatchManager plugin on this branch.
+        #expect(first is SmartwatchWatchCommandProcessor)
         #expect(first as AnyObject? === second as AnyObject?, "One instance means one request-ID cache")
     }
 

@@ -77,6 +77,11 @@ private final class WatchCommandOverrideAssembly: Assembly {
         container.register(WatchPresetsProvider.self) { [presets] _ in presets }
         if let processor {
             container.register(WatchCommandProcessor.self) { _ in processor }.inObjectScope(.container)
+        } else {
+            // These tests cover the Garmin series' own processor; the app now uses the
+            // SmartwatchManager plugin's, so register this one explicitly.
+            container.register(WatchCommandProcessor.self) { r in BaseWatchCommandProcessor(resolver: r) }
+                .inObjectScope(.container)
         }
         if let apsManager {
             container.register(APSManager.self) { _ in apsManager }.inObjectScope(.container)

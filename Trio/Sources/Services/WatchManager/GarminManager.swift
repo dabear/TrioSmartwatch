@@ -81,6 +81,9 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     @Injected() private var presetsProvider: WatchPresetsProvider!
     @Injected() private var watchCommandProcessor: WatchCommandProcessor!
 
+    /// Revoked by `BaseSettingsManager` itself; read here only to refresh the watch after a revocation.
+    @Injected() private var watchCommandAuthorization: WatchCommandAuthorization!
+
     /// The plugin side: the latest snapshot from SmartwatchHost, and the delegate for commands.
     @Injected() private var smartwatchBridge: GarminSmartwatchBridge!
 
@@ -183,6 +186,12 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
 
     // MARK: - Settings Change Throttle
 
+    /// Max carbs at the last settings notification; the watch caps its carbs picker with it.
+    private var previousMaxCarbs: Decimal = 0
+
+    /// A newer epoch means a command switch went off since, even if it now shows on again.
+    private var lastSeenCommandRevocation: UInt64 = 0
+
     /// Queue for the settings throttle timer
     private let timerQueue = DispatchQueue(label: "BaseGarminManager.timerQueue", qos: .utility)
 
@@ -248,6 +257,8 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         units = settingsManager.settings.units
         glucoseColorScheme = settingsManager.settings.glucoseColorScheme
         previousGarminSettings = settingsManager.settings.garminSettings
+        previousMaxCarbs = settingsManager.settings.maxCarbs
+        lastSeenCommandRevocation = watchCommandAuthorization.current
 
         broadcaster.register(SettingsObserver.self, observer: self)
 
@@ -1069,7 +1080,14 @@ extension BaseGarminManager: SettingsObserver {
         let displayAttributesChanged = currentGarminSettings.primaryAttributeChoice != previousGarminSettings
             .primaryAttributeChoice ||
             currentGarminSettings.secondaryAttributeChoice != previousGarminSettings.secondaryAttributeChoice
-        // Permissions and max carbs reach the command app with the plugin's snapshots.
+        let commandRevocation = watchCommandAuthorization.current
+        let commandSettingsChanged = currentGarminSettings.isCommandControlEnabled != previousGarminSettings
+            .isCommandControlEnabled ||
+            currentGarminSettings.isBolusCommandEnabled != previousGarminSettings.isBolusCommandEnabled ||
+            commandRevocation != lastSeenCommandRevocation
+        lastSeenCommandRevocation = commandRevocation
+        let maxCarbsChanged = settingsManager.settings.maxCarbs != previousMaxCarbs
+        previousMaxCarbs = settingsManager.settings.maxCarbs
         let commandAppChanged = GarminCommandApp(currentGarminSettings) != GarminCommandApp(previousGarminSettings)
 
         // Update stored values
@@ -1095,7 +1113,7 @@ extension BaseGarminManager: SettingsObserver {
                 debug(.watch, "Garmin watchface data enabled, sending update")
             }
             triggerWatchStateUpdate(triggeredBy: "Settings")
-        } else if commandAppChanged {
+        } else if commandSettingsChanged || commandAppChanged {
             // a newly selected command app shows nothing until its first state
             triggerWatchStateUpdate(triggeredBy: "CommandSettings")
         } else if unitsChanged || displayAttributesChanged || colorSchemeChanged {
@@ -1106,8 +1124,9 @@ extension BaseGarminManager: SettingsObserver {
             sendSettingsUpdateThrottled()
         }
 
-        // the complication builds its menu and pickers from these
-        if commandAppChanged {
+        // the complication builds its menu and pickers from these; max bolus and bolus increment live
+        // outside TrioSettings and reach it with the next preset request
+        if commandSettingsChanged || maxCarbsChanged || commandAppChanged {
             pushPresetsToCommandApp(triggeredBy: "CommandSettings")
         }
 

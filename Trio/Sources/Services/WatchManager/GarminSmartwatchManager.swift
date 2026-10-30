@@ -95,8 +95,12 @@ final class GarminSmartwatchManager: SmartwatchManagerUI {
 
     private let bridge: GarminSmartwatchBridge
 
-    init?(rawState _: RawStateValue) {
+    convenience init?(rawState _: RawStateValue) {
         guard let bridge = TrioApp.resolver.resolve(GarminSmartwatchBridge.self) else { return nil }
+        self.init(bridge: bridge)
+    }
+
+    init(bridge: GarminSmartwatchBridge) {
         self.bridge = bridge
         bridge.attach(self)
     }
