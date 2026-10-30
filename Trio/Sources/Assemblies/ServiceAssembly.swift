@@ -18,6 +18,10 @@ final class ServiceAssembly: Assembly {
         container.register(UserNotificationsManager.self) { r in BaseUserNotificationsManager(resolver: r) }
         container.register(WatchManager.self) { r in BaseWatchManager(resolver: r) }
         container.register(BolusCalculationManager.self) { r in BaseBolusCalculationManager(resolver: r) }
+        // Garmin runs as a SmartwatchManager plugin: the bridge links the plugin SmartwatchHost
+        // creates to this Connect IQ manager.
+        container.register(GarminSmartwatchBridge.self) { _ in GarminSmartwatchBridge() }
+            .inObjectScope(.container)
         container.register(GarminManager.self) { r in BaseGarminManager(resolver: r) }
         container.register(SmartwatchHost.self) { r in BaseSmartwatchHost(resolver: r) }
             .inObjectScope(.container)
@@ -36,13 +40,14 @@ final class ServiceAssembly: Assembly {
             .inObjectScope(.container)
         container.register(WatchCommandAuthorization.self) { _ in WatchCommandAuthorization() }
             .inObjectScope(.container)
-        container.register(WatchPresetsProvider.self) { r in BaseWatchPresetsProvider(resolver: r) }
+        // Garmin's presets and commands go through its SmartwatchManager plugin.
+        container.register(WatchPresetsProvider.self) { r in SmartwatchWatchPresetsProvider(resolver: r) }
         // one instance, so its request-ID cache sees every watch request
         container.register(WatchCommandPipeline.self) { r in
             WatchCommandPipeline(authorization: r.resolve(WatchCommandAuthorization.self)!)
         }
         .inObjectScope(.container)
-        container.register(WatchCommandProcessor.self) { r in BaseWatchCommandProcessor(resolver: r) }
+        container.register(WatchCommandProcessor.self) { r in SmartwatchWatchCommandProcessor(resolver: r) }
             .inObjectScope(.container)
         container.register(TrioRemoteControl.self) { r in TrioRemoteControl(resolver: r) }
             .inObjectScope(.container)

@@ -22,6 +22,17 @@ struct SmartwatchPlugin {
                 manufacturer: "Core Devices",
                 image: LupedSmartwatchManager.onboardingImage
             )
+        ),
+        // Experimental: Garmin through the same protocol.
+        SmartwatchPlugin(
+            managerType: GarminSmartwatchManager.self,
+            descriptor: SmartwatchManagerDescriptor(
+                identifier: GarminSmartwatchManager.pluginIdentifier,
+                localizedTitle: GarminSmartwatchManager.localizedTitle,
+                subtitle: "Watchfaces, data fields and command apps",
+                manufacturer: "Garmin",
+                image: GarminSmartwatchManager.onboardingImage
+            )
         )
     ]
 
@@ -753,10 +764,24 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         do {
             // Dated when the user confirmed it on the watch.
             let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: request.requestedAt)
-            try await carbsStorage.storeCarbs([entry], areFetchedFromRemote: false)
+            // Throws when the save fails; the permission is checked once more inside the
+            // transaction, so a switch turned off meanwhile leaves nothing written.
+            try await carbsStorage.storeVerifiedCarbs(entry) { [weak self] in
+                guard let self else { throw SmartwatchCarbEntryError.notAllowed }
+                if self
+                    .refusal(for: manager, capability: .remoteCarbs, isAllowed: UserDefaults.standard.allowSmartwatchCarbs) !=
+                    nil
+                {
+                    throw SmartwatchCarbEntryError.notAllowed
+                }
+            }
             // Counted from when it was stored: a determination from before then can't include it.
             let storedAt = Date()
             await MainActor.run { self.watchCarbEntries.append(WatchCarbEntry(date: storedAt, grams: grams)) }
+        } catch SmartwatchCarbEntryError.notAllowed {
+            await MainActor.run { UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry }
+            log(manager, .error, "Carb entry request rejected while storing: notAllowed")
+            throw SmartwatchCarbEntryError.notAllowed
         } catch {
             await MainActor.run {
                 UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry
