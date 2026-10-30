@@ -584,11 +584,16 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
 
     /// Snoozes Trio's alerts like every other snooze surface, for at most 4 hours.
     /// Critical alerts still sound, as for any snooze.
-    func smartwatchManager(_ manager: SmartwatchManager, requestAlertMute duration: TimeInterval) async throws -> Date {
+    func smartwatchManager(_ manager: SmartwatchManager, requestAlertMute request: SmartwatchAlertMuteRequest) async throws -> Date {
+        let duration = request.duration
         log(manager, .receive, String(format: "Mute request: %.0f min", duration / 60))
         if let refusal = refusal(for: manager, capability: .remoteMute, isAllowed: UserDefaults.standard.allowSmartwatchMute) {
             log(manager, .error, "Mute request rejected: notAllowed (\(refusal))")
             throw SmartwatchAlertMuteError.notAllowed
+        }
+        guard SmartwatchBolusPolicy.Limits.standard.isFresh(request.requestedAt, now: Date()) else {
+            log(manager, .error, String(format: "Mute request rejected: expiredRequest (confirmed %.0f s ago)", Date().timeIntervalSince(request.requestedAt)))
+            throw SmartwatchAlertMuteError.expiredRequest
         }
         guard duration.isFinite, duration > 0 else {
             log(manager, .error, "Mute request rejected: invalid duration")
