@@ -27,6 +27,23 @@ import Testing
         #expect(BaseSmartwatchHost.glucoseAlertType(of: identifier("glucose.low.\(uuid)", manager: "SomeCGM")) == nil)
     }
 
+    @Test("Watch carbs count until a determination includes them") func uncountedWatchCarbs() {
+        let now = Date()
+        let entry = BaseSmartwatchHost.WatchCarbEntry(date: now.addingTimeInterval(-60), grams: 20)
+        // No determination, or one from before the entry: not in COB yet.
+        #expect(BaseSmartwatchHost.uncountedWatchCarbs([entry], determinationDate: nil, now: now) == [entry])
+        #expect(BaseSmartwatchHost.uncountedWatchCarbs(
+            [entry],
+            determinationDate: now.addingTimeInterval(-300),
+            now: now
+        ) == [entry])
+        // A determination after the entry counts it in COB.
+        #expect(BaseSmartwatchHost.uncountedWatchCarbs([entry], determinationDate: now, now: now).isEmpty)
+        // Entries over 30 minutes old are dropped.
+        let old = BaseSmartwatchHost.WatchCarbEntry(date: now.addingTimeInterval(-31 * 60), grams: 20)
+        #expect(BaseSmartwatchHost.uncountedWatchCarbs([old], determinationDate: nil, now: now).isEmpty)
+    }
+
     @Test("Trend arrows match LoopKit's GlucoseTrend") func trends() {
         #expect(BloodGlucose.Direction.tripleUp.smartwatchTrend == .upUpUp)
         #expect(BloodGlucose.Direction.doubleUp.smartwatchTrend == .upUpUp)

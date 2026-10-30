@@ -78,6 +78,8 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
     @MainActor private var bolusContextIssuer = SmartwatchBolusContextIssuer()
     /// How fresh every remote action from the watch must be.
     private let requestWindow = SmartwatchRequestWindow.standard
+    /// Carb entries from the watch that the latest determination may not count yet.
+    @MainActor private var watchCarbEntries: [WatchCarbEntry] = []
 
     private(set) var smartwatchManager: SmartwatchManagerUI? {
         didSet {
@@ -271,6 +273,7 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         if capabilities.contains(.remoteBolus) {
             snapshot.bolusContext = await currentBolusContext(
                 minPredBG: determination?.minPredBG,
+                determinationDate: determination?.timestamp,
                 latestGlucoseDate: readings.last?.date
             )
         }
@@ -325,10 +328,18 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
 
     // MARK: - Watch bolus
 
-    /// The recommendation Trio's Apple Watch app shows for a bolus without carbs.
-    @MainActor private func currentBolusContext(minPredBG: Decimal?, latestGlucoseDate: Date?) async -> SmartwatchBolusContext {
+    /// The recommendation Trio's Apple Watch app shows, counting carbs the watch
+    /// just added as that app counts the carbs it is about to save: the plugin adds
+    /// the carbs of a carbs-and-bolus request first and checks the bolus against
+    /// the next snapshot, before a new determination has counted them in COB.
+    @MainActor private func currentBolusContext(
+        minPredBG: Decimal?,
+        determinationDate: Date?,
+        latestGlucoseDate: Date?
+    ) async -> SmartwatchBolusContext {
+        watchCarbEntries = Self.uncountedWatchCarbs(watchCarbEntries, determinationDate: determinationDate, now: Date())
         let result = await bolusCalculationManager.handleBolusCalculation(
-            carbs: 0,
+            carbs: Decimal(watchCarbEntries.reduce(0) { $0 + $1.grams }),
             useFattyMealCorrection: false,
             useSuperBolus: false,
             lastLoopDate: apsManager.lastLoopDate,
@@ -419,6 +430,21 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
         log(manager, .delegateResponse, String(format: "Watch bolus of %.3f U delivered", units))
         refresh()
         return units
+    }
+
+    struct WatchCarbEntry: Equatable {
+        let date: Date
+        let grams: Double
+    }
+
+    /// The watch carb entries a determination dated `determinationDate` doesn't
+    /// count yet: those added after it. Entries over 30 minutes old are dropped
+    /// too, so carbs are never counted twice and old ones don't raise the
+    /// recommendation; both mistakes only lower it.
+    static func uncountedWatchCarbs(_ entries: [WatchCarbEntry], determinationDate: Date?, now: Date) -> [WatchCarbEntry] {
+        entries.filter { entry in
+            entry.date > now.addingTimeInterval(-30 * 60) && determinationDate.map { entry.date > $0 } ?? true
+        }
     }
 
     private final class BolusOutcome: @unchecked Sendable {
@@ -672,9 +698,11 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
             log(manager, .error, "Carb entry request rejected: \(error)\(refusal.map { " (\($0))" } ?? "")")
             throw error
         }
+        let entryDate = Date()
         do {
-            let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: Date())
+            let entry = carbsStorage.makeCarbEntry(carbs: Decimal(grams), date: entryDate)
             try await carbsStorage.storeCarbs([entry], areFetchedFromRemote: false)
+            await MainActor.run { self.watchCarbEntries.append(WatchCarbEntry(date: entryDate, grams: grams)) }
         } catch {
             await MainActor.run {
                 UserDefaults.standard.lastSmartwatchCarbEntry = previousEntry
