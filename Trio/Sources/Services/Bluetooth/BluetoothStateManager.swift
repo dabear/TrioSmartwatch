@@ -10,7 +10,7 @@ public class BaseBluetoothStateManager: NSObject, BluetoothStateManager, Injecta
     private var centralManager: CBCentralManager?
     private var bluetoothObservers = WeakSynchronizedSet<BluetoothObserver>()
 
-    init(resolver: Resolver) {
+    nonisolated init(resolver: Resolver) {
         super.init()
         injectServices(resolver)
         if bluetoothAuthorization != .notDetermined {
@@ -18,7 +18,7 @@ public class BaseBluetoothStateManager: NSObject, BluetoothStateManager, Injecta
         }
     }
 
-    public var bluetoothAuthorization: BluetoothAuthorization {
+    public nonisolated var bluetoothAuthorization: BluetoothAuthorization {
         BluetoothAuthorization(CBCentralManager.authorization)
     }
 
