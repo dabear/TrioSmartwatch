@@ -176,4 +176,11 @@ import Testing
         #expect(unknown.suspended)
         #expect(await storedRows().map(\.state) == ["suspended", "resuming", "unknown"])
     }
+
+    @Test("An inoperable pump blocks the loop like a suspended one") func testInoperableBlocksLoop() {
+        #expect(status(.pumpInoperable).pumpStatus.suspended)
+        #expect(status(.suspended(Date())).pumpStatus.suspended)
+        #expect(!status(.active(Date())).pumpStatus.suspended)
+        #expect(!status(tempBasal()).pumpStatus.suspended)
+    }
 }
