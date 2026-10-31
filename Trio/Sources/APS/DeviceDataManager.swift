@@ -353,6 +353,9 @@ extension BaseDeviceDataManager: PumpManagerDelegate {
         settingsManager.settings.dosingMode.automation != .off // Trio may command the pump
     }
 
+    // Display-only hint for pump UIs; Trio doesn't report one.
+    var automatedTreatmentState: AutomatedTreatmentState? { nil }
+
     func pumpManager(
         _: LoopKit.PumpManager,
         didRequestBasalRateScheduleChange _: LoopKit.BasalRateSchedule,
@@ -649,16 +652,13 @@ extension BaseDeviceDataManager: DeviceManagerDelegate {
         trioAlertManager.retractAlert(identifier: identifier)
     }
 
-    func doesIssuedAlertExist(identifier _: Alert.Identifier, completion _: @escaping (Result<Bool, Error>) -> Void) {}
+    func doesIssuedAlertExist(identifier _: Alert.Identifier) async throws -> Bool { false }
 
-    func lookupAllUnretracted(managerIdentifier _: String, completion _: @escaping (Result<[PersistedAlert], Error>) -> Void) {}
+    func lookupAllUnretracted(managerIdentifier _: String) async throws -> [PersistedAlert] { [] }
 
-    func lookupAllUnacknowledgedUnretracted(
-        managerIdentifier _: String,
-        completion _: @escaping (Result<[PersistedAlert], Error>) -> Void
-    ) {}
+    func lookupAllUnacknowledgedUnretracted(managerIdentifier _: String) async throws -> [PersistedAlert] { [] }
 
-    func recordRetractedAlert(_: Alert, at _: Date) {}
+    func recordRetractedAlert(_: Alert, at _: Date) async throws {}
 
     func removeNotificationRequests(for _: DeviceManager, identifiers: [String]) {
         DispatchQueue.main.async {
