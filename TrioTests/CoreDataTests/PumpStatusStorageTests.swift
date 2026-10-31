@@ -52,7 +52,8 @@ import Testing
             startDate: Date(),
             endDate: Date().addingTimeInterval(30 * 60),
             value: 1.2,
-            unit: .unitsPerHour
+            unit: .unitsPerHour,
+            decisionId: nil
         ))
     }
 
