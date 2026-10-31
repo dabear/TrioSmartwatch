@@ -39,7 +39,6 @@ private let mmolPerL = LoopUnit.millimolesPerLiter
             "\"bgTargets\"",
             "\"carbRatios\"",
             "\"insulinSensitivities\"",
-            "\"automatedDelivery\"",
             "\"name\" : \"Trio\"",
             "\"version\" : \"0.6.0\""
         ]
@@ -146,19 +145,6 @@ private let mmolPerL = LoopUnit.millimolesPerLiter
 
         #expect(datum.basal?.rateMaximum?.value == 0.5, "Should preserve low max basal")
         #expect(datum.bolus?.amountMaximum?.value == 1.0, "Should preserve low max bolus")
-    }
-
-    // MARK: - Automated Delivery Flag
-
-    @Test("Automated delivery flag reflects dosing state") func automatedDeliveryFlag() {
-        let enabled = makeSettings(dosingEnabled: true)
-        let disabled = makeSettings(dosingEnabled: false)
-
-        let enabledDatum = enabled.datumPumpSettings(for: "test", hostIdentifier: "Trio", hostVersion: "0.6.0")
-        let disabledDatum = disabled.datumPumpSettings(for: "test", hostIdentifier: "Trio", hostVersion: "0.6.0")
-
-        #expect(enabledDatum.automatedDelivery == true)
-        #expect(disabledDatum.automatedDelivery == false)
     }
 
     // MARK: - Unit Conversion
