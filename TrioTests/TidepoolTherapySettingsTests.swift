@@ -1,5 +1,6 @@
 import CryptoKit
 import HealthKit
+import LoopAlgorithm
 import LoopKit
 import Testing
 import TidepoolKit
@@ -8,9 +9,9 @@ import TidepoolKit
 @testable import Trio
 
 // Both Trio and TidepoolServiceKit define mgPerDL,
-// causing ambiguity. Use HealthKit's native API to avoid the conflict.
-private let mgPerDL = HKUnit.gramUnit(with: .milli).unitDivided(by: HKUnit.literUnit(with: .deci))
-private let mmolPerL = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassBloodGlucose).unitDivided(by: .liter())
+// causing ambiguity. Name the LoopKit units directly to avoid the conflict.
+private let mgPerDL = LoopUnit.milligramsPerDeciliter
+private let mmolPerL = LoopUnit.millimolesPerLiter
 
 // MARK: - StoredSettings → Tidepool Datum Tests
 
@@ -240,7 +241,7 @@ private let mmolPerL = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassB
         insulinModel: StoredInsulinModel? = nil,
         cgmDevice: HKDevice? = nil,
         pumpDevice: HKDevice? = nil,
-        bgUnit: HKUnit = mgPerDL
+        bgUnit: LoopUnit = mgPerDL
     ) -> StoredSettings {
         let tz = TimeZone(secondsFromGMT: 0)!
 
@@ -268,7 +269,7 @@ private let mmolPerL = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassB
         )!
 
         let defaultCarb = CarbRatioSchedule(
-            unit: .gram(),
+            unit: .gram,
             dailyItems: [RepeatingScheduleValue(startTime: 0, value: 15.0)],
             timeZone: tz
         )!
@@ -279,10 +280,7 @@ private let mmolPerL = HKUnit.moleUnit(with: .milli, molarMass: HKUnitMolarMassB
             dosingEnabled: dosingEnabled,
             glucoseTargetRangeSchedule: glucoseTargetRangeSchedule ?? defaultTarget,
             preMealTargetRange: nil,
-            workoutTargetRange: nil,
-            overridePresets: nil,
-            scheduleOverride: nil,
-            preMealOverride: nil,
+            overridePresets: [],
             maximumBasalRatePerHour: maxBasal,
             maximumBolus: maxBolus,
             suspendThreshold: suspendThreshold,
@@ -499,10 +497,7 @@ private extension StoredSettings {
                 override: nil
             ),
             preMealTargetRange: nil,
-            workoutTargetRange: nil,
-            overridePresets: nil,
-            scheduleOverride: nil,
-            preMealOverride: nil,
+            overridePresets: [],
             maximumBasalRatePerHour: 5.0,
             maximumBolus: 10.0,
             suspendThreshold: nil,
@@ -520,7 +515,7 @@ private extension StoredSettings {
                 timeZone: tz
             )!,
             carbRatioSchedule: CarbRatioSchedule(
-                unit: .gram(),
+                unit: .gram,
                 dailyItems: [RepeatingScheduleValue(startTime: 0, value: 15.0)],
                 timeZone: tz
             )!,
@@ -549,10 +544,7 @@ private extension StoredSettings {
                 override: nil
             ),
             preMealTargetRange: nil,
-            workoutTargetRange: nil,
-            overridePresets: nil,
-            scheduleOverride: nil,
-            preMealOverride: nil,
+            overridePresets: [],
             maximumBasalRatePerHour: nil,
             maximumBolus: nil,
             suspendThreshold: nil,
@@ -568,7 +560,7 @@ private extension StoredSettings {
                 timeZone: tz
             )!,
             carbRatioSchedule: CarbRatioSchedule(
-                unit: .gram(),
+                unit: .gram,
                 dailyItems: [RepeatingScheduleValue(startTime: 0, value: 15.0)],
                 timeZone: tz
             )!,
