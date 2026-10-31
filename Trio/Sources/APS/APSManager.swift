@@ -1427,7 +1427,7 @@ final class BaseAPSManager: APSManager, Injectable {
 private extension PumpManager {
     func enactTempBasal(unitsPerHour: Double, for duration: TimeInterval) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.enactTempBasal(unitsPerHour: unitsPerHour, for: duration) { error in
+            self.enactTempBasal(decisionId: nil, unitsPerHour: unitsPerHour, for: duration) { error in
                 if let error = error {
                     debug(.pump, "Temp basal command failed: \(unitsPerHour) U/h for \(Int(duration / 60)) min")
                     continuation.resume(throwing: error)
@@ -1442,7 +1442,7 @@ private extension PumpManager {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let automaticValue = automatic ? BolusActivationType.automatic : BolusActivationType.manualRecommendationAccepted
 
-            self.enactBolus(units: units, activationType: automaticValue) { error in
+            self.enactBolus(decisionId: nil, units: units, activationType: automaticValue) { error in
                 if let error = error {
                     debug(.pump, "Bolus command failed: \(units) U")
                     continuation.resume(throwing: error)
