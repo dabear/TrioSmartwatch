@@ -1,7 +1,7 @@
 import Combine
 import CoreData
 import Foundation
-import HealthKit
+import LoopAlgorithm
 import LoopKit
 import LoopKitUI
 import MedtrumKit
@@ -117,8 +117,8 @@ final class BaseDeviceDataManager: DeviceDataManager, Injectable {
                 // determines are within the user's configured maxBasal.
                 let pumpSettings = settingsManager.pumpSettings
                 let deliveryLimits = DeliveryLimits(
-                    maximumBasalRate: HKQuantity(unit: .internationalUnitsPerHour, doubleValue: Double(pumpSettings.maxBasal)),
-                    maximumBolus: HKQuantity(unit: .internationalUnit(), doubleValue: Double(pumpSettings.maxBolus))
+                    maximumBasalRate: LoopQuantity(unit: .internationalUnitsPerHour, doubleValue: Double(pumpSettings.maxBasal)),
+                    maximumBolus: LoopQuantity(unit: .internationalUnit, doubleValue: Double(pumpSettings.maxBolus))
                 )
 
                 processQueue.async {
