@@ -758,7 +758,8 @@ final class BaseAPSManager: APSManager, Injectable {
         guard let state = pumpManager?.status.basalDeliveryState else { return fetchedTempBasal }
 
         switch state {
-        case .active:
+        case .active,
+             .pumpInoperable:
             return TempBasal(duration: 0, rate: 0, temp: .absolute, timestamp: date)
         case let .tempBasal(dose):
             let rate = Decimal(dose.unitsPerHour)

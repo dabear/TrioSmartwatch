@@ -472,6 +472,8 @@ extension BaseDeviceDataManager: PumpManagerDelegate {
         case .suspended:
             suspended.send(true)
             scheduledBasal.send(false)
+        case .pumpInoperable:
+            scheduledBasal.send(nil) // pump is not currently available
         default:
             suspended.send(false)
             scheduledBasal.send(false)
