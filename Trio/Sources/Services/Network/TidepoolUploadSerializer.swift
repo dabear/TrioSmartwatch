@@ -180,7 +180,7 @@ extension TidepoolUploadSerializer {
     static func awaitUpload(
         _ label: String,
         timeout: TimeInterval = 120,
-        _ operation: @escaping () async throws -> Void
+        _ operation: @escaping @Sendable () async throws -> Void
     ) async -> Result<Bool, Error> {
         await awaitUpload(label, timeout: timeout) { completion in
             Task {
