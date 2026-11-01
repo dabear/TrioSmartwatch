@@ -20,7 +20,7 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 ## Steps
 
 1. [x] This plan.
-2. [ ] Garmin watch state built from a snapshot, as a pure function with tests.
+2. [x] Garmin watch state built from a snapshot, as a pure function with tests (`GarminWatchState+Snapshot.swift`, 7 tests).
 3. [ ] `BaseGarminManager` reads snapshots instead of Core Data, files and services.
 4. [ ] `GarminSmartwatchManager` plugin, listed in the host's plugins.
 5. [ ] Build and tests.
