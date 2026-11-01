@@ -29,6 +29,8 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 7. [x] One class: `BaseGarminManager` merged into `GarminSmartwatchManager`; no `GarminManager` service or protocol. Removing the plugin unregisters it from Connect IQ.
 8. [x] The plugin moved to its own repo, [GarminSmartwatchKit](https://github.com/dabear/GarminSmartwatchKit) (experimental, MIT), added here as a submodule like LupedSmartwatchKit. Its devices and settings (watch apps, display values, glucose colours) are in its `rawState` and its own settings screen; Trio's Garmin settings, models and views are removed. Its 11 tests pass in Trio's workspace.
 
+9. [x] On LoopKit next-dev (Trio #1718 merged in): LoopKit from dabear/LoopKit `trio-next-dev-smartwatch-manager`; the kit keeps only the async `acknowledgeAlert`. Host and kit tests pass.
+
 ## Left after these steps
 
 - Not run on a device or a Garmin yet; only simulator builds and unit tests.
