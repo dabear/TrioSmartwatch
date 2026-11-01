@@ -27,12 +27,12 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 5. [x] Build and tests: Trio builds; the Garmin snapshot, host and container tests pass (13).
 6. [x] Trio's Garmin settings say, while the plugin isn't added, that Garmin gets no data until it is.
 7. [x] One class: `BaseGarminManager` merged into `GarminSmartwatchManager`; no `GarminManager` service or protocol. Removing the plugin unregisters it from Connect IQ.
+8. [x] The plugin moved to its own repo, [GarminSmartwatchKit](https://github.com/dabear/GarminSmartwatchKit) (experimental, MIT), added here as a submodule like LupedSmartwatchKit. Its devices and settings (watch apps, display values, glucose colours) are in its `rawState` and its own settings screen; Trio's Garmin settings, models and views are removed. Its 11 tests pass in Trio's workspace.
 
 ## Left after these steps
 
 - Not run on a device or a Garmin yet; only simulator builds and unit tests.
 
 - The host holds one watch plugin: Garmin and Pebble can't run at the same time.
-- Garmin's devices and settings stay in Trio's Garmin settings (devices under dev's key), not in the plugin's `rawState`.
-- The glucose colour scheme and the display choices are still read from Trio's settings.
+- Devices and settings chosen in dev Trio aren't carried over: add Garmin and choose them again.
 - Test on a Garmin.

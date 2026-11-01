@@ -75,39 +75,6 @@ struct TrioSettings: JSON, Equatable, Encodable {
     var homeStatsPanelFace: HomeStatsPanelFace = .timeInRange
     var homeStatsPanelRange: HomeStatsPanelRange = .today
     var requireAdjustmentsConfirmation: Bool = false
-
-    /// Selected Garmin watchface (Trio or SwissAlpine)
-    var garminWatchface: GarminWatchface = .trio
-    var garminDatafield: GarminDatafield = .none
-
-    /// Primary attribute choice for Garmin display (COB, ISF, or Sensitivity Ratio)
-    var primaryAttributeChoice: GarminPrimaryAttributeChoice = .cob
-
-    /// Secondary attribute choice for Garmin display (TBR or Eventual BG)
-    var secondaryAttributeChoice: GarminSecondaryAttributeChoice = .tbr
-
-    /// Controls whether watchface data transmission is enabled
-    var isWatchfaceDataEnabled: Bool = false
-
-    /// Computed property that groups all Garmin settings into a single struct
-    var garminSettings: GarminWatchSettings {
-        get {
-            GarminWatchSettings(
-                watchface: garminWatchface,
-                datafield: garminDatafield,
-                primaryAttributeChoice: primaryAttributeChoice,
-                secondaryAttributeChoice: secondaryAttributeChoice,
-                isWatchfaceDataEnabled: isWatchfaceDataEnabled
-            )
-        }
-        set {
-            garminWatchface = newValue.watchface
-            garminDatafield = newValue.datafield
-            primaryAttributeChoice = newValue.primaryAttributeChoice
-            secondaryAttributeChoice = newValue.secondaryAttributeChoice
-            isWatchfaceDataEnabled = newValue.isWatchfaceDataEnabled
-        }
-    }
 }
 
 /// Used to decode settings keys that no longer have a matching stored property (e.g. renamed keys kept for migration).
@@ -375,31 +342,6 @@ extension TrioSettings: Decodable {
 
         if let requireAdjustmentsConfirmation = try? container.decode(Bool.self, forKey: .requireAdjustmentsConfirmation) {
             settings.requireAdjustmentsConfirmation = requireAdjustmentsConfirmation
-        }
-
-        if let garminWatchface = try? container.decode(GarminWatchface.self, forKey: .garminWatchface) {
-            settings.garminWatchface = garminWatchface
-        }
-
-        if let garminDatafield = try? container.decode(GarminDatafield.self, forKey: .garminDatafield) {
-            settings.garminDatafield = garminDatafield
-        }
-
-        if let primaryAttributeChoice = try? container
-            .decode(GarminPrimaryAttributeChoice.self, forKey: .primaryAttributeChoice)
-        {
-            settings.primaryAttributeChoice = primaryAttributeChoice
-        }
-
-        if let secondaryAttributeChoice = try? container.decode(
-            GarminSecondaryAttributeChoice.self,
-            forKey: .secondaryAttributeChoice
-        ) {
-            settings.secondaryAttributeChoice = secondaryAttributeChoice
-        }
-
-        if let isWatchfaceDataEnabled = try? container.decode(Bool.self, forKey: .isWatchfaceDataEnabled) {
-            settings.isWatchfaceDataEnabled = isWatchfaceDataEnabled
         }
 
         self = settings

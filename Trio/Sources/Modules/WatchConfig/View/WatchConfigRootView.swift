@@ -15,7 +15,6 @@ extension WatchConfig {
                     header: Text("Smartwatch Configuration"),
                     content: {
                         NavigationLink("Apple Watch", destination: WatchConfigAppleWatchView(resolver: resolver, state: state))
-                        NavigationLink("Garmin", destination: WatchConfigGarminView(state: state))
                         WatchConfigSmartwatchRows(resolver: resolver)
                     }
                 ).listRowBackground(Color.chart)

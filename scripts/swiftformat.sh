@@ -124,5 +124,6 @@ trailingClosures \
 --exclude AccuChekKit \
 --exclude EversenseKit \
 --exclude SyaiKit \
---exclude LupedSmartwatchKit
+--exclude LupedSmartwatchKit \
+    --exclude GarminSmartwatchKit
       

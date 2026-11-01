@@ -1,6 +1,6 @@
 # Garmin Update Flow - Visual Diagram
 
-> **On `experimental/garmin-plugin-from-dev` this flow is replaced:** `GarminSmartwatchManager` sends when the host sends it a new snapshot (a new reading or loop result), when a device becomes ready, when the watch asks, and after settings changes. The Core Data triggers and fallback timers below are dev's. See `docs/garmin-plugin-from-dev.md`.
+> **On `experimental/garmin-plugin-from-dev` this flow is replaced:** Garmin is the GarminSmartwatchKit plugin (submodule), which sends when the host sends it a new snapshot (a new reading or loop result), when a device becomes ready, when the watch asks, and after settings changes. The Core Data triggers and fallback timers below are dev's. See `docs/garmin-plugin-from-dev.md`.
 
 ## New Simplified Architecture
 

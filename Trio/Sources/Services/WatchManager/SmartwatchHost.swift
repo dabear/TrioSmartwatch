@@ -1,6 +1,8 @@
 import Combine
 import CoreData
 import Foundation
+import GarminSmartwatchKit
+import GarminSmartwatchKitUI
 import LoopKit
 import LoopKitUI
 import LupedSmartwatchKit
@@ -28,7 +30,7 @@ struct SmartwatchPlugin {
             descriptor: SmartwatchManagerDescriptor(
                 identifier: GarminSmartwatchManager.pluginIdentifier,
                 localizedTitle: GarminSmartwatchManager.localizedTitle,
-                subtitle: "Experimental: the Garmin watch apps in Trio's Garmin settings",
+                subtitle: "Experimental: Connect IQ watchfaces, watch apps and datafields",
                 manufacturer: "Garmin",
                 image: GarminSmartwatchManager.onboardingImage
             )
@@ -104,8 +106,6 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
 
     init(resolver: Resolver) {
         injectServices(resolver)
-        // Trio's own plugins (Garmin) take Trio's services from here.
-        GarminSmartwatchManager.resolver = resolver
         restoreManager()
         trioAlertManager.addAlertForwarder(self)
         broadcaster.register(SettingsObserver.self, observer: self)

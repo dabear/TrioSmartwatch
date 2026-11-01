@@ -15,11 +15,6 @@ struct WatchConfigAppleWatchView: BaseView {
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppState.self) var appState
 
-    private func onDelete(offsets: IndexSet) {
-        state.devices.remove(atOffsets: offsets)
-        state.deleteGarminDevice()
-    }
-
     var body: some View {
         List {
             SettingInputSection(
