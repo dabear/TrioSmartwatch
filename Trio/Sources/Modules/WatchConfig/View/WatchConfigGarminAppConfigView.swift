@@ -15,6 +15,13 @@ struct WatchConfigGarminAppConfigView: View {
 
     var body: some View {
         Form {
+            if !state.isGarminPluginAdded {
+                Section {
+                    Text("Garmin gets no data until Garmin is added as a watch: Watch → Add Garmin.")
+                        .foregroundStyle(.orange)
+                }
+            }
+
             // MARK: - Watchface Selection Section
 
             Section(

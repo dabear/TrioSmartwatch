@@ -5,11 +5,15 @@ import SwiftUI
 extension WatchConfig {
     final class StateModel: BaseStateModel<Provider> {
         @Injected() private var garmin: GarminManager!
+        @Injected() private var smartwatchHost: SmartwatchHost!
 
         @Published var units: GlucoseUnits = .mgdL
         @Published var devices: [IQDevice] = []
         @Published var confirmBolusFaster = false
         @Published var showForecastWatch = false
+
+        /// Whether the Garmin watch plugin is added: without it, Garmin gets no data.
+        @Published var isGarminPluginAdded = false
 
         /// Garmin watch settings containing all watch-related configuration
         @Published var garminSettings = GarminWatchSettings()
@@ -26,6 +30,14 @@ extension WatchConfig {
             subscribeSetting(\.showForecastWatch, on: $showForecastWatch) { showForecastWatch = $0 }
 
             devices = garmin.devices
+
+            isGarminPluginAdded = smartwatchHost.smartwatchManager is GarminSmartwatchManager
+            smartwatchHost.smartwatchManagerChanged
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] in
+                    self?.isGarminPluginAdded = self?.smartwatchHost.smartwatchManager is GarminSmartwatchManager
+                }
+                .store(in: &lifetime)
         }
 
         /// Prompts the user to select Garmin devices and updates the device list

@@ -61,6 +61,13 @@ struct WatchConfigGarminView: View {
 
     var deviceListView: some View {
         Form {
+            if !state.isGarminPluginAdded {
+                Section {
+                    Text("Garmin gets no data until Garmin is added as a watch: Watch → Add Garmin.")
+                        .foregroundStyle(.orange)
+                }
+            }
+
             #if targetEnvironment(simulator)
 
                 // MARK: - Simulator Testing

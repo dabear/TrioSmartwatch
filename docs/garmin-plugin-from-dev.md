@@ -24,8 +24,11 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 3. [x] `BaseGarminManager` reads snapshots instead of Core Data, files and services (450 lines fewer; the Connect IQ code is unchanged).
 4. [x] `GarminSmartwatchManager` plugin, listed in the host's plugins (Add Watch → Garmin). Its settings explain it and remove it.
 5. [x] Build and tests: Trio builds; the Garmin snapshot, host and container tests pass (13).
+6. [x] Trio's Garmin settings say, while the plugin isn't added, that Garmin gets no data until it is.
 
 ## Left after these steps
+
+- Not run on a device or a Garmin yet; only simulator builds and unit tests.
 
 - The host holds one watch plugin: Garmin and Pebble can't run at the same time.
 - Garmin's devices and settings stay in Trio's Garmin settings, not in the plugin's `rawState`; the device-selection URL still goes to `BaseGarminManager` directly.
