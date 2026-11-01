@@ -666,6 +666,34 @@ extension BaseSmartwatchHost: SmartwatchManagerDelegate {
         log(manager, type, event.message, device: event.deviceIdentifier)
     }
 
+    /// Shows the plugin's alert about the watch as Trio's own alert from this
+    /// plugin. A plugin can't raise a critical alert: at most time-sensitive.
+    func smartwatchManager(_ manager: SmartwatchManager, issueDeviceAlert alert: SmartwatchDeviceAlert) {
+        let content = Alert.Content(
+            title: alert.title,
+            body: alert.body,
+            acknowledgeActionButtonLabel: String(localized: "OK", comment: "Button to acknowledge an alert from a watch plugin")
+        )
+        let trioAlert = Alert(
+            identifier: Alert.Identifier(managerIdentifier: manager.pluginIdentifier, alertIdentifier: alert.identifier.value),
+            foregroundContent: content,
+            backgroundContent: content,
+            trigger: .immediate,
+            interruptionLevel: alert.level == .informational ? .active : .timeSensitive,
+            sound: nil
+        )
+        log(manager, .error, "Watch plugin alert: \(alert.title): \(alert.body)", device: nil)
+        trioAlertManager.issueAlert(trioAlert)
+    }
+
+    func smartwatchManager(_ manager: SmartwatchManager, retractDeviceAlert identifier: SmartwatchAlertIdentifier) {
+        trioAlertManager
+            .retractAlert(
+                identifier: Alert
+                    .Identifier(managerIdentifier: manager.pluginIdentifier, alertIdentifier: identifier.value)
+            )
+    }
+
     func smartwatchManager(_ manager: SmartwatchManager, requestBolus request: SmartwatchBolusRequest) async throws -> Double {
         try await handleBolusRequest(request, from: manager)
     }
