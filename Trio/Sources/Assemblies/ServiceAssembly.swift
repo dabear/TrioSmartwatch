@@ -18,7 +18,6 @@ final class ServiceAssembly: Assembly {
         container.register(UserNotificationsManager.self) { r in BaseUserNotificationsManager(resolver: r) }
         container.register(WatchManager.self) { r in BaseWatchManager(resolver: r) }
         container.register(BolusCalculationManager.self) { r in BaseBolusCalculationManager(resolver: r) }
-        container.register(GarminManager.self) { r in BaseGarminManager(resolver: r) }
         container.register(SmartwatchHost.self) { r in BaseSmartwatchHost(resolver: r) }
             .inObjectScope(.container)
         container.register(ContactImageManager.self) { r in BaseContactImageManager(resolver: r) }

@@ -6,9 +6,10 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 
 ## Approach
 
-- `GarminSmartwatchManager` is a `SmartwatchManager` plugin in the host's watch slot. It declares glucose, history, loop status and therapy, and **no remote actions**.
-- `BaseGarminManager` keeps everything Connect IQ: devices, watch apps, settings, throttling, debouncing, sending. Only its data source changes: it builds the Garmin watch state from the plugin's latest snapshot instead of reading Core Data, files and services itself.
-- Without the plugin added, Garmin gets no data.
+- One class, `GarminSmartwatchManager` (dev's `BaseGarminManager`, renamed): a `SmartwatchManager` plugin in the host's watch slot. It declares glucose, history, loop status and therapy, and **no remote actions**.
+- It keeps everything Connect IQ from dev: devices, watch apps, settings, throttling, debouncing, sending. Only its data source changes: it builds the Garmin watch state from the host's latest snapshot instead of reading Core Data, files and services itself.
+- The host creates it like any watch plugin; there is no separate Garmin service. It gets Trio's services through a resolver the host sets. Garmin Connect's device-selection callback reaches it through the host (`watchHostDidReceiveURL`).
+- Without the plugin added, Garmin gets no data; Trio's Garmin settings say so.
 
 ## Differences from dev, all from the host's snapshot
 
@@ -25,12 +26,13 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 4. [x] `GarminSmartwatchManager` plugin, listed in the host's plugins (Add Watch → Garmin). Its settings explain it and remove it.
 5. [x] Build and tests: Trio builds; the Garmin snapshot, host and container tests pass (13).
 6. [x] Trio's Garmin settings say, while the plugin isn't added, that Garmin gets no data until it is.
+7. [x] One class: `BaseGarminManager` merged into `GarminSmartwatchManager`; no `GarminManager` service or protocol. Removing the plugin unregisters it from Connect IQ.
 
 ## Left after these steps
 
 - Not run on a device or a Garmin yet; only simulator builds and unit tests.
 
 - The host holds one watch plugin: Garmin and Pebble can't run at the same time.
-- Garmin's devices and settings stay in Trio's Garmin settings, not in the plugin's `rawState`; the device-selection URL still goes to `BaseGarminManager` directly.
+- Garmin's devices and settings stay in Trio's Garmin settings (devices under dev's key), not in the plugin's `rawState`.
 - The glucose colour scheme and the display choices are still read from Trio's settings.
 - Test on a Garmin.

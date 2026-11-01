@@ -76,7 +76,6 @@ extension Notification.Name {
         _ = resolver.resolve(WatchManager.self)!
         _ = resolver.resolve(ContactImageManager.self)!
         _ = resolver.resolve(HealthKitManager.self)!
-        _ = resolver.resolve(GarminManager.self)!
         _ = resolver.resolve(SmartwatchHost.self)!
         _ = resolver.resolve(BluetoothStateManager.self)!
         _ = resolver.resolve(PluginManager.self)!
@@ -528,16 +527,10 @@ extension Notification.Name {
         try await overrideRunDeletion
     }
 
+    /// Offered to the watch plugin, for a companion app's callback such as Garmin
+    /// Connect's device selection (`device-select-resp`).
     private func handleURL(_ url: URL) {
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-
-        switch components?.host {
-        case "device-select-resp":
-            resolver.resolve(NotificationCenter.self)!.post(name: .openFromGarminConnect, object: url)
-        default:
-            // Offer anything else to the watch plugin, for a companion app's callback.
-            _ = resolver.resolve(SmartwatchHost.self)!.handle(url)
-        }
+        _ = resolver.resolve(SmartwatchHost.self)!.handle(url)
     }
 }
 

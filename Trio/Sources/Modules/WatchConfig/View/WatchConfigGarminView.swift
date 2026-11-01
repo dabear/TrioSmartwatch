@@ -19,7 +19,7 @@ struct WatchConfigGarminView: View {
     #if targetEnvironment(simulator)
         /// Adds a mock Garmin device for simulator UI testing
         private func addMockDevice() {
-            let mockDevice = BaseGarminManager.MockIQDevice.createSimulated()
+            let mockDevice = GarminSmartwatchManager.MockIQDevice.createSimulated()
             state.devices.append(mockDevice)
             state.deleteGarminDevice()
         }

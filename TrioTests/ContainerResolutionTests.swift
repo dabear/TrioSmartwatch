@@ -31,7 +31,6 @@ import Testing
         #expect(resolver.resolve(WatchManager.self) != nil)
         #expect(resolver.resolve(ContactImageManager.self) != nil)
         #expect(resolver.resolve(HealthKitManager.self) != nil)
-        #expect(resolver.resolve(GarminManager.self) != nil)
         #expect(resolver.resolve(BluetoothStateManager.self) != nil)
         #expect(resolver.resolve(PluginManager.self) != nil)
         #expect(resolver.resolve(AlertPermissionsChecker.self) != nil)

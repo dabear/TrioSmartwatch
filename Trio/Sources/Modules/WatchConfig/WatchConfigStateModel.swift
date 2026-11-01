@@ -4,8 +4,10 @@ import SwiftUI
 
 extension WatchConfig {
     final class StateModel: BaseStateModel<Provider> {
-        @Injected() private var garmin: GarminManager!
         @Injected() private var smartwatchHost: SmartwatchHost!
+
+        /// The Garmin watch plugin, if added: it keeps the devices and sends to them.
+        private var garmin: GarminSmartwatchManager? { smartwatchHost.smartwatchManager as? GarminSmartwatchManager }
 
         @Published var units: GlucoseUnits = .mgdL
         @Published var devices: [IQDevice] = []
@@ -29,19 +31,21 @@ extension WatchConfig {
             subscribeSetting(\.confirmBolusFaster, on: $confirmBolusFaster) { confirmBolusFaster = $0 }
             subscribeSetting(\.showForecastWatch, on: $showForecastWatch) { showForecastWatch = $0 }
 
-            devices = garmin.devices
-
-            isGarminPluginAdded = smartwatchHost.smartwatchManager is GarminSmartwatchManager
+            updateGarmin()
             smartwatchHost.smartwatchManagerChanged
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] in
-                    self?.isGarminPluginAdded = self?.smartwatchHost.smartwatchManager is GarminSmartwatchManager
-                }
+                .sink { [weak self] in self?.updateGarmin() }
                 .store(in: &lifetime)
+        }
+
+        private func updateGarmin() {
+            isGarminPluginAdded = garmin != nil
+            devices = garmin?.devices ?? []
         }
 
         /// Prompts the user to select Garmin devices and updates the device list
         func selectGarminDevices() {
+            guard let garmin else { return }
             garmin.selectDevices()
                 .receive(on: DispatchQueue.main)
                 .weakAssign(to: \.devices, on: self)
@@ -50,7 +54,7 @@ extension WatchConfig {
 
         /// Updates the Garmin manager with the current device list
         func deleteGarminDevice() {
-            garmin.updateDeviceList(devices)
+            garmin?.updateDeviceList(devices)
         }
 
         /// Handles watchface selection changes by automatically disabling data transmission

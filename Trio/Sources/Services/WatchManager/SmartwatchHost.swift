@@ -104,6 +104,8 @@ final class BaseSmartwatchHost: SmartwatchHost, Injectable {
 
     init(resolver: Resolver) {
         injectServices(resolver)
+        // Trio's own plugins (Garmin) take Trio's services from here.
+        GarminSmartwatchManager.resolver = resolver
         restoreManager()
         trioAlertManager.addAlertForwarder(self)
         broadcaster.register(SettingsObserver.self, observer: self)
