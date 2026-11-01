@@ -22,6 +22,16 @@ struct SmartwatchPlugin {
                 manufacturer: "Core Devices",
                 image: LupedSmartwatchManager.onboardingImage
             )
+        ),
+        SmartwatchPlugin(
+            managerType: GarminSmartwatchManager.self,
+            descriptor: SmartwatchManagerDescriptor(
+                identifier: GarminSmartwatchManager.pluginIdentifier,
+                localizedTitle: GarminSmartwatchManager.localizedTitle,
+                subtitle: "Experimental: the Garmin watch apps in Trio's Garmin settings",
+                manufacturer: "Garmin",
+                image: GarminSmartwatchManager.onboardingImage
+            )
         )
     ]
 

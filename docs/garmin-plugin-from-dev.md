@@ -21,9 +21,9 @@ The earlier attempt (`experimental/garmin-on-smartwatch-manager`) started from t
 
 1. [x] This plan.
 2. [x] Garmin watch state built from a snapshot, as a pure function with tests (`GarminWatchState+Snapshot.swift`, 7 tests).
-3. [ ] `BaseGarminManager` reads snapshots instead of Core Data, files and services.
-4. [ ] `GarminSmartwatchManager` plugin, listed in the host's plugins.
-5. [ ] Build and tests.
+3. [x] `BaseGarminManager` reads snapshots instead of Core Data, files and services (450 lines fewer; the Connect IQ code is unchanged).
+4. [x] `GarminSmartwatchManager` plugin, listed in the host's plugins (Add Watch → Garmin). Its settings explain it and remove it.
+5. [x] Build and tests: Trio builds; the Garmin snapshot, host and container tests pass (13).
 
 ## Left after these steps
 

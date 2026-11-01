@@ -1,6 +1,5 @@
 import Combine
 import ConnectIQ
-import CoreData
 import Foundation
 import LoopKit
 import Swinject
@@ -42,22 +41,9 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     /// Broadcaster used for publishing or subscribing to global events (e.g., unit changes).
     @Injected() private var broadcaster: Broadcaster!
 
-    /// APSManager containing insulin pump logic, e.g., for making bolus requests, reading basal info, etc.
-    @Injected() private var apsManager: APSManager!
-
-    /// Manages local user settings, such as glucose units (mg/dL or mmol/L).
+    /// Manages local user settings: Garmin's watch apps and display choices, units, colour scheme.
     @Injected() private var settingsManager: SettingsManager!
 
-    /// Stores, retrieves, and updates glucose data in CoreData.
-    @Injected() private var glucoseStorage: GlucoseStorage!
-
-    /// Stores, retrieves, and updates insulin dose determinations in CoreData.
-    @Injected() private var determinationStorage: DeterminationStorage!
-
-    /// JSON settings store, used here to read the glucose target profile.
-    @Injected() private var fileStorage: FileStorage!
-
-    @Injected() private var iobService: IOBService!
     @Injected() private var trioAlertManager: TrioAlertManager!
 
     /// Persists the user's device list between app launches.
@@ -128,16 +114,7 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     private var lastPreparedDataHash: Int?
     private var lastPreparedWatchState: [GarminWatchState]?
 
-    // MARK: - Glucose/Determination Coordination
-
-    /// Delay before sending glucose if determination hasn't arrived (seconds)
-    /// Based on log analysis: avg delay ~5s, max ~11s with new timer coordination
-    private let glucoseFallbackDelay: TimeInterval = 10
-
-    /// Pending glucose fallback task - cancelled if determination arrives first
-    private var pendingGlucoseFallback: DispatchWorkItem?
-
-    /// Queue for glucose fallback timer
+    /// Queue for the settings throttle timer
     private let timerQueue = DispatchQueue(label: "BaseGarminManager.timerQueue", qos: .utility)
 
     // MARK: - Settings Change Throttle
@@ -154,19 +131,11 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     /// How long to wait for additional settings changes before sending (seconds)
     private let settingsThrottleDuration: TimeInterval = 10
 
-    // MARK: - CoreData & Subscriptions
+    // MARK: - Snapshots
 
-    /// Queue for handling Core Data change notifications
-    private let queue = DispatchQueue(label: "BaseGarminManager.queue", qos: .utility)
-
-    /// Publishes any changed CoreData objects that match our filters (e.g., OrefDetermination, GlucoseStored).
-    private var coreDataPublisher: AnyPublisher<Set<NSManagedObjectID>, Never>?
-
-    /// Additional local subscriptions (separate from `cancellables`) for CoreData events.
+    /// Follows the Garmin plugin's snapshots (`GarminSmartwatchManager.snapshots`),
+    /// the only source of the watch state.
     private var subscriptions = Set<AnyCancellable>()
-
-    /// Represents the main (view) context for CoreData, typically used on the main thread.
-    let viewContext = CoreDataStack.shared.persistentContainer.viewContext
 
     /// Array of Garmin `IQDevice` objects currently tracked.
     /// Changing this property triggers re-registration and updates persisted devices.
@@ -182,7 +151,7 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     // MARK: - Initialization
 
     /// Creates a new `BaseGarminManager`, injecting required services, restoring any persisted devices,
-    /// and setting up watchers for data changes (e.g., glucose updates).
+    /// and following the Garmin plugin's snapshots.
     /// - Parameter resolver: Swinject resolver for injecting dependencies like the Router.
     init(resolver: Resolver) {
         router = resolver.resolve(Router.self)!
@@ -201,36 +170,17 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         previousGarminSettings = settingsManager.settings.garminSettings
 
         broadcaster.register(SettingsObserver.self, observer: self)
-        // Glucose targets are not part of TrioSettings, so editing the target profile
-        // notifies this observer rather than firing settingsDidChange.
-        broadcaster.register(BGTargetsObserver.self, observer: self)
 
-        coreDataPublisher =
-            CoreDataStack.shared.entityChangePublisher
-                .receive(on: queue)
-                .share()
-                .eraseToAnyPublisher()
-
-        // Glucose updates - start 20s fallback timer
-        // When loop is working: determination arrives within ~5s, cancels timer, sends complete data
-        // When loop is slow/failing: timer fires after 20s, sends glucose with stale loop data
-        // This ensures watch gets fresh glucose even if loop doesn't complete
-        glucoseStorage.updatePublisher
-            .receive(on: DispatchQueue.global(qos: .background))
-            .sink { [weak self] _ in
-                self?.handleGlucoseUpdate()
+        // Each snapshot from the Garmin plugin, sent when a reading or the loop's
+        // output changes; none while the plugin isn't added.
+        GarminSmartwatchManager.snapshots
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] snapshot in
+                if snapshot != nil {
+                    self?.triggerWatchStateUpdate(triggeredBy: "Snapshot")
+                }
             }
             .store(in: &subscriptions)
-
-        // IOB updates - also wait for determination like glucose does
-        iobService.iobPublisher
-            .receive(on: DispatchQueue.global(qos: .background))
-            .sink { [weak self] _ in
-                self?.handleIOBUpdate()
-            }
-            .store(in: &subscriptions)
-
-        registerHandlers()
     }
 
     // MARK: - Settings Helpers
@@ -285,123 +235,11 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         }
     }
 
-    // MARK: - Internal Setup / Handlers
-
-    /// Sets up handlers for OrefDetermination and GlucoseStored entity changes in CoreData.
-    /// When these change, we re-compute the Garmin watch state and send updates to the watch.
-    private func registerHandlers() {
-        // OrefDetermination changes - debounce at CoreData level
-        coreDataPublisher?
-            .filteredByEntityName("OrefDetermination")
-            .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.triggerWatchStateUpdate(triggeredBy: "Determination")
-            }
-            .store(in: &subscriptions)
-
-        // GlucoseStored changes - catches single glucose inserts that updatePublisher misses
-        // (updatePublisher only fires for batch inserts, not single glucose readings)
-        // Debounce at subscriber level to collapse multiple rapid CoreData notifications into one
-        coreDataPublisher?
-            .filteredByEntityName("GlucoseStored")
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleGlucoseUpdate()
-            }
-            .store(in: &subscriptions)
-    }
-
-    /// Handles glucose updates with delayed fallback
-    /// Waits up to 10 seconds for determination to arrive before sending glucose-only update
-    /// This ensures we send complete data when loop is working, but still update watch if loop is slow/failing
-    private func handleGlucoseUpdate() {
-        guard !devices.isEmpty else { return }
-
-        // Cancel any existing fallback timer
-        pendingGlucoseFallback?.cancel()
-
-        // Create new fallback task
-        let fallback = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-
-            Task {
-                do {
-                    if self.debugWatchState {
-                        debug(
-                            .watch,
-                            "Garmin glucose fallback fired, no determination within \(Int(self.glucoseFallbackDelay)) s"
-                        )
-                    }
-
-                    let watchState = try await self.setupGarminWatchState(triggeredBy: "Glucose")
-                    let watchStateData = try JSONEncoder().encode(watchState)
-                    self.watchStateSubject.send(watchStateData)
-                } catch {
-                    warning(.watch, "Garmin glucose fallback update failed", error: error)
-                }
-            }
-        }
-
-        pendingGlucoseFallback = fallback
-        timerQueue.asyncAfter(deadline: .now() + glucoseFallbackDelay, execute: fallback)
-
-        if debugWatchState {
-            debug(.watch, "Garmin update waiting up to \(Int(glucoseFallbackDelay)) s for determination after new glucose")
-        }
-    }
-
-    /// Handles IOB updates with delayed fallback
-    /// Also waits up to 10 seconds for determination to arrive, restarting the shared timer
-    /// This prevents IOB changes from triggering premature watch updates before determination arrives
-    private func handleIOBUpdate() {
-        guard !devices.isEmpty else { return }
-
-        // Cancel any existing fallback timer (restart the 20s window)
-        pendingGlucoseFallback?.cancel()
-
-        // Create new fallback task
-        let fallback = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
-
-            Task {
-                do {
-                    if self.debugWatchState {
-                        debug(.watch, "Garmin IOB fallback fired, no determination within \(Int(self.glucoseFallbackDelay)) s")
-                    }
-
-                    let watchState = try await self.setupGarminWatchState(triggeredBy: "IOB")
-                    let watchStateData = try JSONEncoder().encode(watchState)
-                    self.watchStateSubject.send(watchStateData)
-                } catch {
-                    warning(.watch, "Garmin IOB fallback update failed", error: error)
-                }
-            }
-        }
-
-        pendingGlucoseFallback = fallback
-        timerQueue.asyncAfter(deadline: .now() + glucoseFallbackDelay, execute: fallback)
-
-        if debugWatchState {
-            debug(.watch, "Garmin update waiting up to \(Int(glucoseFallbackDelay)) s for determination after IOB change")
-        }
-    }
+    // MARK: - Updates
 
     /// Triggers watch state preparation and sends to debounce subject
-    /// If triggered by Determination, cancels pending glucose fallback timer
     private func triggerWatchStateUpdate(triggeredBy trigger: String) {
         guard !devices.isEmpty else { return }
-
-        // If determination arrived, cancel the glucose fallback timer
-        // Determination includes both fresh glucose and loop data
-        if trigger == "Determination" {
-            if pendingGlucoseFallback != nil {
-                pendingGlucoseFallback?.cancel()
-                pendingGlucoseFallback = nil
-                if debugWatchState {
-                    debug(.watch, "Garmin fallback cancelled, determination arrived")
-                }
-            }
-        }
 
         Task {
             do {
@@ -459,85 +297,6 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         }
     }
 
-    // MARK: - CoreData Fetch Methods
-
-    /// Fetches recent glucose readings from CoreData, up to specified limit.
-    /// - Parameter limit: Maximum number of glucose entries to fetch (default: 2)
-    /// - Returns: An array of `NSManagedObjectID`s for glucose readings.
-    private func fetchGlucose(limit: Int = 2) async throws -> [NSManagedObjectID] {
-        let context = CoreDataStack.shared.newTaskContext()
-        context.name = "fetchGlucose"
-        let results = try await CoreDataStack.shared.fetchEntitiesAsync(
-            ofType: GlucoseStored.self,
-            onContext: context,
-            predicate: NSPredicate.glucose,
-            key: "date",
-            ascending: false,
-            fetchLimit: limit
-        )
-
-        return try await context.perform {
-            guard let fetchedResults = results as? [GlucoseStored] else {
-                throw CoreDataError.fetchError(function: #function, file: #file)
-            }
-            return fetchedResults.map(\.objectID)
-        }
-    }
-
-    /// Fetches the most recent temporary basal rate from CoreData pump history.
-    /// - Returns: An array containing the NSManagedObjectID of the latest temp basal event, if any.
-    private func fetchTempBasals() async throws -> [NSManagedObjectID] {
-        let context = CoreDataStack.shared.newTaskContext()
-        context.name = "fetchTempBasals"
-        // a scheduled-basal row is a rate assertion, not a running temp basal: with fetchLimit 1
-        // it would otherwise become "the current temp basal" on the watch
-        let tempBasalPredicate = NSPredicate(format: "tempBasal != nil AND tempBasal.isScheduledBasal == NO")
-        let compoundPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-            NSPredicate.pumpHistoryLast24h,
-            tempBasalPredicate
-        ])
-
-        let results = try await CoreDataStack.shared.fetchEntitiesAsync(
-            ofType: PumpEventStored.self,
-            onContext: context,
-            predicate: compoundPredicate,
-            key: "timestamp",
-            ascending: false,
-            fetchLimit: 1,
-            relationshipKeyPathsForPrefetching: ["tempBasal"]
-        )
-
-        return try await context.perform {
-            guard let pumpEvents = results as? [PumpEventStored] else {
-                throw CoreDataError.fetchError(function: #function, file: #file)
-            }
-            return pumpEvents.map(\.objectID)
-        }
-    }
-
-    /// Fetches all determinations from the last 30 minutes (no fetch limit).
-    /// Returns them sorted newest first, allowing us to find both enacted and suggested determinations.
-    /// - Returns: An array of `NSManagedObjectID`s for all determinations in the 30-minute window.
-    private func fetchDeterminations30Min() async throws -> [NSManagedObjectID] {
-        let context = CoreDataStack.shared.newTaskContext()
-        context.name = "fetchDeterminations30Min"
-        let results = try await CoreDataStack.shared.fetchEntitiesAsync(
-            ofType: OrefDetermination.self,
-            onContext: context,
-            predicate: NSPredicate.predicateFor30MinAgoForDetermination,
-            key: "deliverAt",
-            ascending: false,
-            fetchLimit: 0 // No limit - get all determinations in 30min window
-        )
-
-        return try await context.perform {
-            guard let fetchedResults = results as? [OrefDetermination] else {
-                throw CoreDataError.fetchError(function: #function, file: #file)
-            }
-            return fetchedResults.map(\.objectID)
-        }
-    }
-
     // MARK: - Watch State Setup
 
     /// Builds an array of GarminWatchState objects containing current glucose, trend, loop data, and historical readings.
@@ -545,8 +304,8 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     /// - Parameter triggeredBy: A string describing what triggered this update (for debugging/logging).
     /// - Returns: An array of `GarminWatchState` objects with the latest watch data.
     func setupGarminWatchState(triggeredBy: String = #function) async throws -> [GarminWatchState] {
-        // Skip if no devices connected
-        guard !devices.isEmpty else {
+        // Skip if no devices connected, or no snapshot from the Garmin plugin yet
+        guard !devices.isEmpty, let snapshot = GarminSmartwatchManager.snapshots.value else {
             return []
         }
 
@@ -554,195 +313,35 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
             debug(.watch, "Preparing Garmin watch state, trigger \(triggeredBy)")
         }
 
-        // Fetch glucose - SwissAlpine needs 24, Trio needs 2 (for delta calculation)
-        let glucoseLimit = needsHistoricalGlucoseData ? 24 : 2
-        let glucoseIds = try await fetchGlucose(limit: glucoseLimit)
+        let garminSettings = settingsManager.settings.garminSettings
+        let options = GarminWatchState.DisplayOptions(
+            primaryAttributeChoice: garminSettings.primaryAttributeChoice.rawValue,
+            secondaryAttributeChoice: garminSettings.secondaryAttributeChoice.rawValue,
+            // Short form, not the enum raw value: this is the wire format the watchface reads.
+            glucoseColorScheme: glucoseColorScheme == .dynamicColor ? "dynamic" : "static",
+            sendsHistory: needsHistoricalGlucoseData
+        )
+        let watchStates = GarminWatchState.states(from: snapshot, options: options)
 
-        // Fetch all determinations from last 30 minutes (no limit)
-        // This ensures we get both enacted and suggested determinations
-        let allDeterminationIds = try await fetchDeterminations30Min()
-
-        let tempBasalIds = try await fetchTempBasals()
-
-        // Scheduled profile target only, matching the Home chart -- overrides and temp
-        // targets are not reflected.
-        let bgTargets = await fileStorage.retrieveAsync(OpenAPS.Settings.bgTargets, as: BGTargets.self)
-            ?? BGTargets(from: OpenAPS.defaults(for: OpenAPS.Settings.bgTargets))
-            ?? BGTargets(units: .mgdL, userPreferredUnits: .mgdL, targets: [])
-        let targetGlucoseValue = bgTargets.currentTarget().map { Int16(truncating: $0 as NSDecimalNumber) }
-
-        // Extract all needed values from self before entering perform block (Sendable compliance)
-        let unitsValue = units
-        let iobValue = formatIOB(iobService.currentIOB ?? Decimal(0))
-        let basalProfile = settingsManager.preferences.basalProfile as? [BasalProfileEntry] ?? []
-        let displayPrimaryChoice = settingsManager.settings.garminSettings.primaryAttributeChoice.rawValue
-        let displaySecondaryChoice = settingsManager.settings.garminSettings.secondaryAttributeChoice.rawValue
-        // Short form, not the enum raw value: this is the wire format the watchface reads.
-        let colorSchemeValue = glucoseColorScheme == .dynamicColor ? "dynamic" : "static"
-        let needsHistoricalData = needsHistoricalGlucoseData
-        let shouldDebug = debugWatchState
-        let previousHash = lastPreparedDataHash
-        let previousWatchState = lastPreparedWatchState
-
-        // Capture context locally for use in perform block
-        let context = CoreDataStack.shared.newTaskContext()
-        context.name = "setupGarminWatchState"
-
-        let watchStates = await context.perform {
-            // Fetch Core Data objects inside perform block
-            let glucoseObjects = glucoseIds.compactMap { context.object(with: $0) as? GlucoseStored }
-            let allDeterminationObjects = allDeterminationIds.compactMap { context.object(with: $0) as? OrefDetermination }
-            let tempBasalObjects = tempBasalIds.compactMap { context.object(with: $0) as? PumpEventStored }
-            var watchStates: [GarminWatchState] = []
-
-            let unitsHint = unitsValue == .mgdL ? "mgdl" : "mmol"
-
-            // Find enacted determination for timestamp (when loop actually ran)
-            // If no enacted determination exists in last 30 min, use a synthetic timestamp
-            // of "31 minutes ago" so watchface can distinguish between:
-            //   - nil = no data received yet (watch startup)
-            //   - 31+ min old = loop is stale
-            let enactedDetermination = allDeterminationObjects.first(where: { $0.enacted })
-            let enactedTimestamp: Date = enactedDetermination?.timestamp ?? Date().addingTimeInterval(-31 * 60)
-
-            // Extract data values from most recent determination (enacted or suggested)
-            // Suggested sets provide latest calculations even if loop hasn't run yet
-            var cobValue: Double?
-            var sensRatioValue: Double?
-            var isfValue: Int16?
-            var eventualBGValue: Int16?
-
-            if let latestDetermination = allDeterminationObjects.first {
-                cobValue = Double(latestDetermination.cob)
-
-                if let ratio = latestDetermination.sensitivityRatio {
-                    sensRatioValue = Double(truncating: ratio)
-                }
-
-                if let isf = latestDetermination.insulinSensitivity {
-                    isfValue = Int16(truncating: isf)
-                }
-
-                if let eventualBG = latestDetermination.eventualBG {
-                    eventualBGValue = Int16(truncating: eventualBG)
-                }
+        // Deduplicate: Check if data is unchanged from last preparation
+        if watchStates.hashValue == lastPreparedDataHash {
+            if debugWatchState {
+                debug(.watch, "Garmin watch state unchanged")
             }
-
-            // TBR from temp basal or profile
-            var tbrValue: Double?
-            if let firstTempBasal = tempBasalObjects.first,
-               let tempBasalData = firstTempBasal.tempBasal,
-               let tempRate = tempBasalData.rate
-            {
-                tbrValue = Double(truncating: tempRate)
-            } else {
-                // Fall back to scheduled basal from profile
-                if !basalProfile.isEmpty {
-                    let now = Date()
-                    let calendar = Calendar.current
-                    let currentTimeMinutes = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
-
-                    for entry in basalProfile.reversed() {
-                        if entry.minutes <= currentTimeMinutes {
-                            tbrValue = Double(entry.rate)
-                            break
-                        }
-                    }
-                }
-            }
-
-            // Process glucose readings
-            let entriesToSend = needsHistoricalData ? glucoseObjects.count : 1
-
-            for (index, glucose) in glucoseObjects.enumerated() {
-                guard index < entriesToSend else { break }
-
-                let glucoseValue = glucose.glucose
-
-                var watchState = GarminWatchState()
-
-                // Loop timestamp: Only use enacted determination timestamp (never glucose timestamp)
-                // This shows when the loop actually executed, not when glucose was received
-                if index == 0 {
-                    watchState.date = UInt64(enactedTimestamp.timeIntervalSince1970 * 1000)
-                } else {
-                    watchState.date = glucose.date.map { UInt64($0.timeIntervalSince1970 * 1000) }
-                }
-
-                watchState.sgv = glucoseValue
-
-                // Only add extended data for first entry
-                if index == 0 {
-                    watchState.direction = glucose.direction ?? "--"
-
-                    // Delta calculation
-                    if glucoseObjects.count > 1 {
-                        watchState.delta = glucose.glucose - glucoseObjects[1].glucose
-                    } else {
-                        watchState.delta = 0
-                    }
-
-                    // Glucose timestamp: Used by watchface to determine if glucose is fresh
-                    // Enables green coloring when: enacted loop is 6+ min old but glucose is <10 min old
-                    watchState.glucoseDate = glucose.date.map { UInt64($0.timeIntervalSince1970 * 1000) }
-
-                    watchState.units_hint = unitsHint
-                    watchState.iob = iobValue
-                    watchState.cob = cobValue
-                    watchState.tbr = tbrValue
-                    watchState.isf = isfValue
-                    watchState.eventualBG = eventualBGValue
-                    watchState.sensRatio = sensRatioValue
-                    watchState.displayPrimaryAttributeChoice = displayPrimaryChoice
-                    watchState.displaySecondaryAttributeChoice = displaySecondaryChoice
-                    watchState.glucoseColorScheme = colorSchemeValue
-                    watchState.targetGlucose = targetGlucoseValue
-                }
-
-                watchStates.append(watchState)
-            }
-
-            // Deduplicate: Check if data is unchanged from last preparation
-            let currentHash = watchStates.hashValue
-            if currentHash == previousHash {
-                if shouldDebug {
-                    debug(.watch, "Garmin watch state unchanged")
-                }
-                return previousWatchState ?? watchStates
-            }
-
-            if shouldDebug {
-                let iobFormatted = String(format: "%.1f", watchStates.first?.iob ?? 0)
-                let cobFormatted = String(format: "%.0f", watchStates.first?.cob ?? 0)
-                let tbrFormatted = String(format: "%.2f", watchStates.first?.tbr ?? 0)
-                let sensRatioFormatted = String(format: "%.2f", watchStates.first?.sensRatio ?? 0)
-                let targetFormatted = watchStates.first?.targetGlucose.map { "\($0)" } ?? "none"
-                debug(
-                    .watch,
-                    "Garmin watch state prepared: \(watchStates.count) entries, BG \(watchStates.first?.sgv ?? 0), IOB \(iobFormatted) U, COB \(cobFormatted) g, temp basal \(tbrFormatted) U/h, eventual BG \(watchStates.first?.eventualBG ?? 0), sensitivity ratio \(sensRatioFormatted), color scheme \(watchStates.first?.glucoseColorScheme ?? "none"), target \(targetFormatted)"
-                )
-            }
-
-            return watchStates
+            return lastPreparedWatchState ?? watchStates
         }
 
-        // Cache for deduplication (outside perform block)
+        if debugWatchState {
+            let first = watchStates.first
+            debug(
+                .watch,
+                "Garmin watch state prepared: \(watchStates.count) entries, BG \(first?.sgv ?? 0), IOB \(String(format: "%.1f", first?.iob ?? 0)) U, COB \(String(format: "%.0f", first?.cob ?? 0)) g, temp basal \(String(format: "%.2f", first?.tbr ?? 0)) U/h, eventual BG \(first?.eventualBG ?? 0), sensitivity ratio \(String(format: "%.2f", first?.sensRatio ?? 0)), color scheme \(first?.glucoseColorScheme ?? "none"), target \(first?.targetGlucose.map { "\($0)" } ?? "none")"
+            )
+        }
+
         lastPreparedDataHash = watchStates.hashValue
         lastPreparedWatchState = watchStates
-
         return watchStates
-    }
-
-    /// Formats IOB (Insulin On Board) value with 1 decimal precision for display.
-    /// Prevents small values from rounding to zero by enforcing a minimum magnitude of 0.1.
-    /// - Parameter value: The IOB value to format.
-    /// - Returns: The formatted IOB value as a Double with 1 decimal place.
-    private func formatIOB(_ value: Decimal) -> Double {
-        let doubleValue = NSDecimalNumber(decimal: value).doubleValue
-        if doubleValue.magnitude < 0.1, doubleValue != 0 {
-            return doubleValue > 0 ? 0.1 : -0.1
-        }
-        return (doubleValue * 10).rounded() / 10
     }
 
     // MARK: - Device & App Registration
@@ -1139,16 +738,5 @@ extension BaseGarminManager: SettingsObserver {
 
         // Store current Garmin settings for next comparison
         previousGarminSettings = currentGarminSettings
-    }
-}
-
-extension BaseGarminManager: BGTargetsObserver {
-    /// Called when the glucose target profile is edited.
-    /// - Parameter _: The updated targets, re-read from storage during preparation.
-    func bgTargetsDidChange(_: BGTargets) {
-        if debugWatchState {
-            debug(.watch, "Glucose targets changed, scheduling Garmin update")
-        }
-        sendSettingsUpdateThrottled()
     }
 }
