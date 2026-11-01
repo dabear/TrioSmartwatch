@@ -642,14 +642,14 @@ extension BaseDeviceDataManager: PumpManagerDelegate {
 // MARK: - DeviceManagerDelegate
 
 extension BaseDeviceDataManager: DeviceManagerDelegate {
-    func issueAlert(_ alert: Alert) {
+    nonisolated func issueAlert(_ alert: Alert) {
         debug(.alerts, "Pump alert issued: \(alert.identifier.alertIdentifier)")
-        trioAlertManager.issueAlert(alert)
+        processQueue.async { self.trioAlertManager.issueAlert(alert) }
     }
 
-    func retractAlert(identifier: Alert.Identifier) {
+    nonisolated func retractAlert(identifier: Alert.Identifier) {
         debug(.alerts, "Pump alert retracted: \(identifier.alertIdentifier)")
-        trioAlertManager.retractAlert(identifier: identifier)
+        processQueue.async { self.trioAlertManager.retractAlert(identifier: identifier) }
     }
 
     func doesIssuedAlertExist(identifier _: Alert.Identifier) async throws -> Bool { false }

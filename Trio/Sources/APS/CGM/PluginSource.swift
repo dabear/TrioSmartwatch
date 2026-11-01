@@ -116,12 +116,12 @@ extension PluginSource: CGMManagerDelegate {
     /// logging treatment as everything else. Used to be a no-op; on
     /// dev-libre3 / LibreLoop builds that meant CGM-issued alerts (sensor
     /// failure, signal loss, expiry, etc.) silently dropped.
-    func issueAlert(_ alert: LoopKit.Alert) {
-        glucoseManager?.trioAlertManager?.issueAlert(alert)
+    nonisolated func issueAlert(_ alert: LoopKit.Alert) {
+        processQueue.async { self.glucoseManager?.trioAlertManager?.issueAlert(alert) }
     }
 
-    func retractAlert(identifier: LoopKit.Alert.Identifier) {
-        glucoseManager?.trioAlertManager?.retractAlert(identifier: identifier)
+    nonisolated func retractAlert(identifier: LoopKit.Alert.Identifier) {
+        processQueue.async { self.glucoseManager?.trioAlertManager?.retractAlert(identifier: identifier) }
     }
 
     /// LoopKit asks this on reconnect to avoid re-issuing an alert that's
@@ -143,8 +143,8 @@ extension PluginSource: CGMManagerDelegate {
     /// LoopKit calls this when a manager itself decides an alert is no
     /// longer relevant. Mirror the action on our pipeline so the in-app
     /// banner, scheduled UN, and history all clear.
-    func recordRetractedAlert(_ alert: LoopKit.Alert, at _: Date) async throws {
-        glucoseManager?.trioAlertManager?.retractAlert(identifier: alert.identifier)
+    nonisolated func recordRetractedAlert(_ alert: LoopKit.Alert, at _: Date) async throws {
+        processQueue.async { self.glucoseManager?.trioAlertManager?.retractAlert(identifier: alert.identifier) }
     }
 
     func cgmManagerWantsDeletion(_ manager: CGMManager) async {
