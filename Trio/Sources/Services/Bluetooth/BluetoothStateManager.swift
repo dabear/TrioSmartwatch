@@ -5,7 +5,7 @@ import Swinject
 
 protocol BluetoothStateManager: BluetoothProvider {}
 
-public class BaseBluetoothStateManager: NSObject, BluetoothStateManager, Injectable {
+@MainActor public class BaseBluetoothStateManager: NSObject, BluetoothStateManager, Injectable {
     private var completion: ((BluetoothAuthorization) -> Void)?
     private var centralManager: CBCentralManager?
     private var bluetoothObservers = WeakSynchronizedSet<BluetoothObserver>()
